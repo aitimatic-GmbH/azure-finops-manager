@@ -97,42 +97,38 @@ Diese Schritte sind identisch zu Weg 1, aber Sie führen sie in Ihrem lokalen Te
 3\. Befehle ausführen: Führen Sie die Schritte 2, 3 und 4 von "Weg 1" aus.
 
 ## Weg 3: Azure Portal (Grafische Oberfläche)
-Dieser Weg ist vollständig klickbar, erfordert aber mehr manuelle Schritte.
-1\. App-Registrierung erstellen
+Dieser Weg ist vollständig klickbar und erfordert keine lokale Kommandozeile.
 
-* Gehen Sie zu Azure Active Directory -> App-Registrierungen -> Neue Registrierung.
-* Geben Sie einen Namen ein (z.B. "GitHub FinOps Workflow") und klicken Sie auf "Registrieren".
-* Kopieren Sie die Anwendungs-ID (Client-ID) und die Verzeichnis-ID (Tenant-ID) von der Übersichtsseite. Das sind zwei Ihrer drei Werte.
+1.  **App-Registrierung in Microsoft Entra ID erstellen**
+    *   Gehen Sie zum **Microsoft Entra ID** Service im Azure Portal.
+    *   Navigieren Sie im linken Menü zu **App-Registrierungen** und klicken Sie auf **+ Neue Registrierung**.
+    *   **WICHTIG:** Geben Sie einen klaren, sprechenden Namen ein, der den Zweck und den Kontext widerspiegelt (z.B. `aitimatic-GmbH_FinOps_Reader` oder `GitHub-FinOps-Workflow`). Klicken Sie dann auf **Registrieren**.
+    *   Kopieren Sie von der Übersichtsseite die **Anwendungs-ID (Client-ID)** und die **Verzeichnis-ID (Mandanten-ID)**. Dies sind zwei Ihrer drei benötigten Werte.
 
-2\. Berechtigungen zuweisen
+2.  **Berechtigungen zuweisen**
+    *   Gehen Sie zu Ihrer **Abonnements**-Ansicht und wählen Sie das relevante Abonnement aus.
+    *   Klicken Sie auf **Zugriffssteuerung (IAM)** -> **+ Hinzufügen** -> **Rollenzuweisung hinzufügen**.
+    *   Wählen Sie die Rolle **Leser** (Reader) aus und klicken Sie auf **Weiter**.
+    *   Klicken Sie auf den blauen Link **+ Mitglieder auswählen**. Ein Fenster öffnet sich auf der rechten Seite.
+    *   Geben Sie im Suchfeld den **exakten Namen** Ihrer App-Registrierung ein (z.B. `aitimatic-GmbH_FinOps_Reader`). Der **Dienstprinzipal** (Service Principal) mit diesem Namen sollte erscheinen.
+    *   Wählen Sie den gefundenen Dienstprinzipal aus und klicken Sie unten auf den Button **Auswählen**.
+    *   Klicken Sie auf **Überprüfen + zuweisen**, um die Rollenzuweisung abzuschließen.
 
-* Gehen Sie zu Ihrer Subscription -> Zugriffssteuerung (IAM) -> Hinzufügen -> Rollenzuweisung hinzufügen.
-* Wählen Sie die Rolle "Leser" (Reader).
-* Suchen und wählen Sie den Namen Ihrer App-Registrierung ("GitHub FinOps Workflow").
-* Klicken Sie auf "Speichern".
+3.  **Vertrauensstellung (Verbundene Anmeldeinformation) einrichten**
+    *   Gehen Sie zurück zu **Microsoft Entra ID** -> **App-Registrierungen** und wählen Sie Ihre App aus.
+    *   Klicken Sie auf **Zertifikate & Geheimnisse** -> **Verbundene Anmeldeinformationen** -> **+ Anmeldeinformationen hinzufügen**.
+    *   Wählen Sie als Szenario für die verbundenen Anmeldeinformationen **GitHub Actions zum Bereitstellen von Azure-Ressourcen**.
+    *   Füllen Sie die Felder aus:
+        *   **Organisation:** Ihr GitHub-Organisationsname.
+        *   **Repository:** Ihr Repository-Name.
+        *   **Entitätstyp:** Wählen Sie **Verzweigung** (Branch).
+        *   **Verzweigung:** Geben Sie `main` ein (oder den Namen Ihres Haupt-Branches).
+    *   Geben Sie eine Beschreibung ein (z.B. "GitHub Actions für FinOps-Repo") und klicken Sie auf **Hinzufügen**.
 
-3\. Vertrauensstellung (Federated Credential) einrichten
-
-* Gehen Sie zurück zu Ihrer App-Registrierung (Azure AD -> App-Registrierungen -> Ihre App).
-* Klicken Sie auf Zertifikate & Geheimnisse -> Verbundene Anmeldeinformationen -> Anmeldeinformationen hinzufügen.
-* Wählen Sie als Szenario "GitHub Actions zum Bereitstellen von Azure-Ressourcen".
-* Füllen Sie die Felder aus:
-  * Organisation: Ihr GitHub-Organisationsname.
-  * Repository: Ihr Repository-Name.
-  * Entitätstyp: Branch.
-  * Branch: main (oder * für alle Branches).
-* Klicken Sie auf "Hinzufügen".
-
-**Azure-Konfiguration abgeschlossen!**
-Sie sollten nun die folgenden drei Informationen zur Hand haben, um sie im nächsten Teil in GitHub zu hinterlegen:
-
-1. Subscription ID (aus Schritt 2 )
-2. Client ID (appId aus Schritt 3)
-3. Tenant ID (tenant aus Schritt 3)
-
-## Teil B: Konfiguration in GitHub
-Nachdem Sie die Konfiguration in Azure abgeschlossen haben, müssen Sie die gesammelten Werte als "Secrets" in Ihrem GitHub-Repository hinterlegen. Secrets sind verschlüsselte Variablen, die nur von GitHub Actions Workflows gelesen werden können.
-Voraussetzung: Sie benötigen Admin-Rechte für das GitHub-Repository.
+**Fertig!** Sie haben nun alle drei Werte gesammelt, die Sie als Secrets in GitHub hinterlegen müssen:
+1.  **Subscription ID** (Die ID Ihres Azure-Abonnements)
+2.  **Client ID** (Die Anwendungs-ID aus Schritt 1)
+3.  **Tenant ID** (Die Mandanten-ID aus Schritt 1)
 
 ### Secrets im GitHub-Repository anlegen
 
