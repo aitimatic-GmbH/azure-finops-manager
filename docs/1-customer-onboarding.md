@@ -149,3 +149,48 @@ Dieser Weg ist vollständig klickbar und erfordert keine lokale Kommandozeile.
 
 **Onboarding abgeschlossen!**
 Ihr Repository ist jetzt bereit. Sie können den Workflow 1 - Analyze Azure Resources über den "Actions"-Tab manuell starten. Der Workflow wird sich nun sicher mit Ihrer Azure Subscription verbinden.
+
+---
+
+## Teil B: Einrichtung der Credentials für Remediation (Schreibzugriff)
+
+**Wichtiger Hinweis:** Dieser Teil ist **optional** und nur notwendig, wenn Sie den Remediation-Workflow (`2-remediate-resources.yml`) nutzen möchten, der aktive Änderungen (z.B. das Löschen von Ressourcen) in Ihrer Azure-Umgebung vornimmt.
+
+**Ziel:** Einen **zweiten, separaten Service Principal** mit Schreibrechten ("Contributor") erstellen, um das Prinzip der minimalen Berechtigungen strikt einzuhalten.
+
+### Zusammenfassung der Änderungen
+
+Sie werden die Schritte aus **Teil A** im Wesentlichen wiederholen, jedoch mit zwei entscheidenden Unterschieden:
+
+1.  **Neuer Name:** Verwenden Sie einen anderen, klaren Namen für den Service Principal, z.B. `aitimatic-GmbH_FinOps_Writer`.
+2.  **Andere Rolle:** Anstelle der "Leser" (Reader)-Rolle weisen Sie die Rolle **"Mitwirkender" (Contributor)** zu.
+
+### Detaillierte Schritte
+
+1.  **Erstellen Sie einen neuen Service Principal:**
+    *   Folgen Sie den Anweisungen aus **Teil A** (Weg 1, 2 oder 3), um eine **neue** App-Registrierung zu erstellen.
+    *   **Namensgebung:** Verwenden Sie einen Namen, der den Schreibzugriff klar kennzeichnet, z.B. `aitimatic-GmbH_FinOps_Writer`.
+    *   Notieren Sie sich die neue **Client ID** und **Tenant ID**.
+
+2.  **Weisen Sie die "Contributor"-Rolle zu:**
+    *   Folgen Sie den Anweisungen aus **Teil A, Schritt 2 (Berechtigungen zuweisen)**.
+    *   Wählen Sie bei der Rollenauswahl jedoch **"Mitwirkender" (Contributor)** anstelle von "Leser" aus.
+
+3.  **Richten Sie die Vertrauensstellung ein:**
+    *   Folgen Sie den Anweisungen aus **Teil A, Schritt 3 (Vertrauensstellung einrichten)** für den *neuen* Service Principal. Die Konfiguration (Organisation, Repository, etc.) ist identisch.
+
+### Neue Secrets im GitHub-Repository anlegen
+
+Nachdem Sie den zweiten Service Principal erstellt haben, müssen Sie zwei neue Secrets in Ihrem GitHub-Repository anlegen. **Die `AZURE_SUBSCRIPTION_ID` bleibt dieselbe und muss nicht neu erstellt werden.**
+
+1.  Navigieren Sie erneut zu `Settings` -> `Secrets and variables` -> `Actions`.
+2.  Erstellen Sie die folgenden beiden Secrets:
+    *   **Secret 4:**
+        *   **Name:** `AZURE_WRITE_CLIENT_ID`
+        *   **Value:** Fügen Sie hier die **Client ID** des *neuen* "Writer"-Service Principals ein.
+    *   **Secret 5:**
+        *   **Name:** `AZURE_WRITE_TENANT_ID`
+        *   **Value:** Fügen Sie hier die **Tenant ID** des *neuen* "Writer"-Service Principals ein.
+
+**Einrichtung für Remediation abgeschlossen!**
+Der Workflow `2-remediate-resources.yml` ist nun in der Lage, sich bei einem `push` für den Verbindungstest und bei einem manuellen Start für die Bereinigung sicher mit den Schreibrechten zu authentifizieren.
