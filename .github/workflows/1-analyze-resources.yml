@@ -1,6 +1,7 @@
 # .github/workflows/1-analyze-resources.yml
 name: '1 - Analyze Azure Resources'
 on:
+  push:
   workflow_dispatch:
 
 permissions:
