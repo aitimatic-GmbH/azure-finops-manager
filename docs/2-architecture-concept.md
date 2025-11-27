@@ -21,41 +21,32 @@ Die gesamte Lösung basiert auf den folgenden, nicht verhandelbaren Prinzipien, 
 *   **Transparenz und Auditierbarkeit:** Jeder Schritt, jede Analyse und jede Änderung wird protokolliert und ist über die GitHub Actions Logs und die erzeugten Artifacts jederzeit nachvollziehbar.
 
 ---
+## 2. Gesamtarchitektur: Die 2-Workflow-Struktur
 
-## 2. Gesamtarchitektur: Die 3-Workflow-Kette
-
-Die Service-Architektur besteht aus einer Kette von drei spezialisierten und voneinander entkoppelten GitHub Actions Workflows. Jeder Workflow hat eine klar definierte Aufgabe und übergibt sein Ergebnis über Workflow-Artifacts an den nächsten Schritt.
+Die Service-Architektur wurde überarbeitet, um die technischen Einschränkungen von GitHub Actions in Feature-Branches zu umgehen und die Testbarkeit zu verbessern. Sie besteht nun aus **zwei primären, voneinander entkoppelten Workflow-Dateien**.
 
 **Diagramm des Prozesses:**
-`[Manueller Trigger] -> [Workflow 1: Analyse] -> (Artifact: Rohdaten) -> [Workflow 2: Reporting] -> (Artifact: Report) -> [Manueller Trigger mit Genehmigung] -> [Workflow 3: Remediation] -> (Artifact: Audit-Log)`
+`[Trigger] -> [Workflow 1 (Job A: Analyse -> Job B: Reporting)] -> (Artifact: Report)`
+`[Separater Trigger] -> [Workflow 2 (Job A: Validierung ODER Job B: Remediation)] -> (Artifact: Audit-Log)`
 
-### 2.1 Workflow 1: Analyse (`1-analyze-resources.yml`)
+### 2.1 Workflow 1: Analyse & Reporting (`1-analyze-and-report.yml`)
 
-*   **Zweck:** Führt ausschließlich lesende Operationen auf der Azure-Subscription des Kunden durch, um Einsparpotenziale zu identifizieren. Dieser Workflow nimmt **niemals** Änderungen vor.
+*   **Zweck:** Dieser Workflow kombiniert die Analyse und das Reporting in einer einzigen, orchestrierten Ausführung. Er ist der primäre Workflow für die Datensammlung und Aufbereitung.
+*   **Struktur:** Er besteht aus zwei Jobs, die nacheinander ausgeführt werden:
+    1.  **Job `analyze`:** Führt ausschließlich lesende Operationen auf Azure durch, um Einsparpotenziale zu identifizieren. Er nutzt einen Service Principal mit **"Leser" (Reader)**-Rechten. Sein Ergebnis (mehrere `.tsv`-Dateien) wird als Artefakt (`finops-analysis-results`) hochgeladen.
+    2.  **Job `report`:** Wartet auf den erfolgreichen Abschluss des `analyze`-Jobs (`needs: analyze`). Er lädt das Artefakt herunter, verarbeitet die Rohdaten mit dem `generate-report.sh`-Skript und lädt den fertigen Markdown-Bericht als Artefakt (`finops-cost-report`) hoch.
 *   **Trigger:**
-    *   **Manuell (`workflow_dispatch`):** Für Ad-hoc-Analysen.
-    *   **Zeitgesteuert (`schedule`):** Für regelmäßige, wöchentliche oder monatliche Scans.
-*   **Authentifizierung:** Nutzt OpenID Connect (OIDC) für eine passwortlose Anmeldung bei Azure mit einer dedizierten App-Registrierung, die ausschließlich **"Leser" (Reader)**-Berechtigungen besitzt.
-*   **Output:** Erstellt für jedes Analyse-Modul eine separate Rohdaten-Datei (z.B. `.tsv`) und lädt alle gefundenen Dateien als einzelnes Workflow-Artifact mit dem Namen `finops-analysis-results` hoch.
+    *   **Manuell (`workflow_dispatch`):** Für Ad-hoc-Analysen über die CLI.
+    *   **Automatisch (`push`):** Für kontinuierliche Tests während der Entwicklung in Feature-Branches.
 
-### 2.2 Workflow 2: Reporting (`2-generate-report.yml`)
+### 2.2 Workflow 2: Remediation (`2-remediate-resources.yml`)
 
-*   **Zweck:** Verarbeitet die vom Analyse-Workflow bereitgestellten Rohdaten und wandelt sie in einen menschenlesbaren, management-tauglichen Bericht im Markdown-Format um.
-*   **Trigger:**
-    *   **Automatisch (`workflow_run`):** Startet automatisch, sobald ein Lauf des Workflows "1 - Analyze Azure Resources" erfolgreich abgeschlossen wurde.
-*   **Authentifizierung:** Benötigt keine Azure-Berechtigungen.
-*   **Output:** Erstellt eine `report.md`-Datei und lädt diese als Workflow-Artifact mit dem Namen `finops-cost-report` hoch.
-
-### 2.3 Workflow 3: Remediation (`3-remediate-resources.yml`)
-
-*   **Zweck:** Führt aktive, ändernde Operationen (z.B. das Löschen von Ressourcen) auf der Azure-Subscription durch.
-*   **Trigger:**
-    *   **Ausschließlich Manuell (`workflow_dispatch`):** Kann unter keinen Umständen automatisch gestartet werden.
-*   **Sicherheits-Gates:**
-    *   **Explizite Genehmigung:** Der Workflow erfordert manuelle Inputs vom Benutzer, um zu definieren, welche Aktionen durchgeführt werden sollen.
-    *   **Bestätigungs-Schutz:** Eine zusätzliche manuelle Eingabe (z.B. das Eintippen von "LÖSCHEN BESTÄTIGEN") ist erforderlich, um den Lauf zu starten.
-*   **Authentifizierung:** Nutzt eine **separate, hochprivilegierte App-Registrierung** mit schreibenden Berechtigungen (z.B. "Contributor").
-*   **Output:** Erstellt ein detailliertes Audit-Log (`remediation-log.txt`) und lädt dieses als Workflow-Artifact mit dem Namen `finops-remediation-log` hoch.
+*   **Zweck:** Führt aktive, ändernde Operationen (z.B. das Löschen von Ressourcen) durch und ist durch mehrere Sicherheitsstufen strikt abgesichert.
+*   **Struktur:** Er besteht aus zwei Jobs, die sich gegenseitig ausschließen und auf unterschiedliche Trigger reagieren:
+    1.  **Job `on-push-validation`:** Läuft **nur** bei einem `push`-Event. Er führt einen sicheren "Verbindungstest" durch, indem er sich mit den hochprivilegierten `WRITE`-Credentials anmeldet, um deren Korrektheit zu validieren, ohne Änderungen vorzunehmen.
+    2.  **Job `manual-remediation`:** Läuft **nur** bei einem manuellen `workflow_dispatch`-Event. Er führt die eigentliche Bereinigung durch, geschützt durch manuelle Inputs (Auswahl des Ressourcentyps, Bestätigungsphrase).
+*   **Authentifizierung:** Nutzt eine **separate, hochprivilegierte App-Registrierung** mit schreibenden Berechtigungen (z.B. "Contributor"), deren Zugangsdaten in `AZURE_WRITE_*`-Secrets gespeichert sind.
+*   **Output:** Erstellt ein detailliertes Audit-Log (`remediation-log.txt`) und lädt dieses als Artefakt hoch.
 
 ---
 
