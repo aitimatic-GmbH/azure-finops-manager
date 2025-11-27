@@ -1,20 +1,7 @@
 # .github/workflows/1-analyze-resources.yml
-
 name: '1 - Analyze Azure Resources'
-
 on:
-  # Manueller Start (aktiv für Entwicklung & Ad-hoc-Analysen)
   workflow_dispatch:
-
-  # Zeitgesteuerter Start (auskommentiert, für produktiven Einsatz)
-  # Führt den Workflow z.B. jeden Sonntag um 02:00 UTC aus.
-  # schedule:
-  #   - cron: '0 2 * * 0'
-
-  # API-gesteuerter Start (auskommentiert, für externe Integrationen)
-  # Ermöglicht das Triggern des Workflows über einen API-Aufruf an das Repository.
-  # repository_dispatch:
-  #   types: [run-finops-analysis]
 
 permissions:
   id-token: write
@@ -34,36 +21,15 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-#-----------------------------------------------------------------------
-# HIER BEGINNEN DIE NEUEN ANALYSE-SCHRITTE
-#-----------------------------------------------------------------------
-
       - name: 'Module 3.1.1: Find unattached disks'
         run: |
           az disk list --query "[?diskState=='Unattached'].{Name:name, ResourceGroup:resourceGroup, SizeGB:diskSizeGb, Location:location}" --output tsv > analysis-unattached-disks.tsv || true
-          echo "Found $(wc -l < analysis-unattached-disks.tsv) unattached disks."
+          echo "Found $(wc -l < analysis-unattached-disks.tsv) unattaced disks"
 
       - name: 'Module 3.1.2: Find unassociated public IPs'
         run: |
           az network public-ip list --query "[?ipConfiguration==null].{Name:name, ResourceGroup:resourceGroup, IPAddress:ipAddress, Location:location}" --output tsv > analysis-unassociated-public-ips.tsv || true
-          echo "Found $(wc -l < analysis-unassociated-public-ips.tsv) unassociated public IPs."
-
-      - name: 'Module 3.3.1: Find old snapshots'
-        run: |
-          # Findet Snapshots, die älter als 90 Tage sind.
-          cutoff_date=$(date -d '-90 days' -u +'%Y-%m-%dT%H:%M:%SZ')
-          az snapshot list --query "[?timeCreated < '$cutoff_date'].{Name:name, ResourceGroup:resourceGroup, SizeGB:diskSizeGb, Location:location}" --output tsv > analysis-old-snapshots.tsv || true
-          echo "Found $(wc -l < analysis-old-snapshots.tsv) snapshots older than 90 days."
-
-      - name: 'Module 3.4: Get Azure Advisor recommendations'
-        run: |
-          # Sammelt nur Empfehlungen der Kategorien Kosten und Hochverfügbarkeit.
-          az advisor recommendation list --query "[?category=='Cost' || category=='HighAvailability'].{Description:shortDescription.problem, Resource:resourceMetadata.resourceId, Category:category}" --output tsv > analysis-azure-advisor-recommendations.tsv || true
-          echo "Found $(wc -l < analysis-azure-advisor-recommendations.tsv) Advisor recommendations."
-
-#-----------------------------------------------------------------------
-# HIER ENDEN DIE NEUEN ANALYSE-SCHRITTE
-#-----------------------------------------------------------------------
+          echo "Found $(wc -l < analysis-unassociated-public-ips.tsv) unassosiated public IPs."
 
       - name: 'Upload analysis results as artifact'
         uses: actions/upload-artifact@v3
