@@ -1,0 +1,71 @@
+# .github/workflows/3-remediate-resources.yml
+
+name: '3 - Remediate Azure Resources'
+
+on:
+  workflow_dispatch:
+    inputs:
+      analysis_run_id:
+        description: 'ID of the analysis run to use for remediation'
+        required: true
+      resource_type_to_remediate:
+        description: 'Type of resource to remediate'
+        required: true
+        type: choice
+        options:
+          - unattached-disks
+          - unassociated-public-ips
+          - old-snapshots
+          - SIMULATION-ONLY
+      confirmation_phrase:
+        description: 'Type "DELETE" to confirm the remediation action.'
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  remediate-resources:
+    runs-on: ubuntu-latest
+
+    # --- SICHERHEITS-CHECK 1: Job startet nur bei korrekter Bestätigung ---
+    if: github.event.inputs.confirmation_phrase == 'DELETE'
+
+    steps:
+      - name: 'Security Gate: Verify confirmation phrase'
+        if: github.event.inputs.confirmation_phrase != 'DELETE'
+        run: |
+          echo "::error::Confirmation phrase is incorrect. Remediation aborted."
+          exit 1
+
+      - name: 'Download analysis results from the specified run'
+        uses: actions/download-artifact@v3
+        with:
+          name: finops-analysis-results
+          run-id: ${{ github.event.inputs.analysis_run_id }}
+
+      - name: 'Azure Login (Privileged)'
+        uses: azure/login@v1
+        with:
+          # WICHTIG: Nutzt separate Secrets für den schreibenden Service Principal
+          client-id: ${{ secrets.AZURE_WRITE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_WRITE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: 'Execute Remediation Script'
+        run: |
+          chmod +x .github/scripts/remediate-resources.sh
+          ./.github/scripts/remediate-resources.sh --type "${{ github.event.inputs.resource_type_to_remediate }}"
+
+      - name: 'Upload Remediation Log'
+        uses: actions/upload-artifact@v3
+        with:
+          name: finops-remediation-log
+          path: remediation-log.txt
+
+      - name: 'Azure Logout'
+        run: |
+          az logout
+          az cache purge
+          az account clear
