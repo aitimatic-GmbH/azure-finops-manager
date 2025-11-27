@@ -1,0 +1,36 @@
+# .github/workflows/2-generate-report.yml
+
+name: '2 - Generate FinOps Report'
+
+on:
+  workflow_run:
+    workflows: ["1 - Analyze Azure Resources"]
+    types:
+      - completed
+
+jobs:
+  generate-report:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: 'Checkout code'
+        uses: actions/checkout@v3
+
+      - name: 'Download analysis results'
+        uses: actions/download-artifact@v3
+        with:
+          name: finops-analysis-results
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: 'Generate Markdown Report'
+        run: |
+          chmod +x .github/scripts/generate-report.sh
+          ./.github/scripts/generate-report.sh
+
+      - name: 'Upload final report'
+        uses: actions/upload-artifact@v3
+        with:
+          name: finops-cost-report
+          path: report.md
+          if-no-files-found: error # Wir wollen einen Fehler, wenn das Skript keinen Report erstellt hat.
