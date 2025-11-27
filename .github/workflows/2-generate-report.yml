@@ -7,6 +7,9 @@ on:
     workflows: ["1 - Analyze Azure Resources"]
     types:
       - completed
+    branches:
+      - main
+      - feature/**
 
 jobs:
   generate-report:
