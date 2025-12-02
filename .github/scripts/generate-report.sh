@@ -1,57 +1,87 @@
 #!/bin/bash
 
-# Definiert den Namen der finalen Report-Datei.
-OUTPUT_FILE="report.md"
+# ==============================================================================
+# create-mock-data.sh
+#
+# Zweck: Erstellt gefälschte Analyse-Ergebnisdateien (.tsv) für Mock Tests.
+#        Die Anzahl der Einträge kann über Umgebungsvariablen gesteuert werden.
+#
+# Anwendung (Lokal):
+#   # Mit Standardwerten:
+#   bash .github/scripts/create-mock-data.sh
+#
+#   # Mit eigenen Werten:
+#   NUM_DISKS=5 NUM_IPS=0 ./github/scripts/create-mock-data.sh
+# ==============================================================================
 
-# Erstellt eine leere Report-Datei und schreibt den Haupt-Titel.
-echo "# Kosten-Optimierungs-Report" > $OUTPUT_FILE
-echo "" >> $OUTPUT_FILE
-echo "Dieser Report fasst die Ergebnisse der automatisierten FinOps-Analyse zusammen." >> $OUTPUT_FILE
-echo "" >> $OUTPUT_FILE
+# --- Konfiguration ---
+# Liest Umgebungsvariablen. Falls nicht gesetzt, werden die Standardwerte (nach :-) verwendet.
+# Die Namen sind an die GitHub Repository Variables angepasst (MOCK_...).
+NUM_DISKS=${MOCK_NUM_DISKS:-3}
+NUM_IPS=${MOCK_NUM_IPS:-2}
+NUM_SNAPSHOTS=${MOCK_NUM_SNAPSHOTS:-4}
+NUM_ADVISOR_HIGH_AVAILABILITY=${MOCK_NUM_ADVISOR_HA:-1}
+NUM_ADVISOR_COST=${MOCK_NUM_ADVISOR_COST:-2}
 
-# --- Funktion zur Verarbeitung einer einzelnen TSV-Datei ---
-# Nimmt den Dateipfad, den Titel für den Report-Abschnitt und die Spaltenüberschriften als Argumente.
-function process_tsv_file() {
-    local file_path=$1
-    local title=$2
-    local headers=$3
+# --- Start ---
+echo "🚀 Generating mock data files with the following configuration:"
+echo "   - Unattached Disks: $NUM_DISKS"
+echo "   - Unassociated IPs: $NUM_IPS"
+echo "   - Old Snapshots: $NUM_SNAPSHOTS"
+echo "   - Advisor (HA): $NUM_ADVISOR_HIGH_AVAILABILITY"
+echo "   - Advisor (Cost): $NUM_ADVISOR_COST"
 
-    # Prüft, ob die Datei existiert und nicht leer ist.
-    if [ -s "$file_path" ]; then
-        echo "Verarbeite Datei: $file_path"
-        
-        # Fügt den Abschnitt zum Report hinzu.
-        echo "## $title" >> $OUTPUT_FILE
-        echo "" >> $OUTPUT_FILE
-        
-        # Konvertiert die TSV-Daten in eine Markdown-Tabelle.
-        {
-            echo "$headers"
-            # Erstellt die Trennlinie für die Markdown-Tabelle dynamisch.
-            echo "$headers" | sed 's/|/|--/g'
-            # Liest die TSV-Datei und formatiert sie.
-            cat "$file_path" | awk -F'\t' '{
-                printf "| "
-                for(i=1; i<=NF; i++) {
-                    printf "%s | ", $i
-                }
-                printf "\n"
-            }'
-        } >> $OUTPUT_FILE
-        
-        echo "" >> $OUTPUT_FILE
-    fi
-}
+# Lösche alte Mock-Dateien, falls vorhanden
+rm -f analysis-*.tsv
+echo "   - Cleaned up old files."
 
-# --- Haupt-Logik: Ruft die Funktion für jede erwartete Datei auf ---
-process_tsv_file "analysis-unattached-disks.tsv" "Verwaiste Festplatten" "| Name | Resource Group | Size (GB) | Location |"
-process_tsv_file "analysis-unassociated-public-ips.tsv" "Ungenutzte öffentliche IPs" "| Name | Resource Group | IP Address | Location |"
-process_tsv_file "analysis-old-snapshots.tsv" "Alte Snapshots (>90 Tage)" "| Name | Resource Group | Size (GB) | Location |"
-process_tsv_file "analysis-azure-advisor-recommendations.tsv" "Azure Advisor Empfehlungen" "| Beschreibung | Ressource | Kategorie |"
-# Hier können wir einfach neue Zeilen für zukünftige Analyse-Module hinzufügen.
+# --- Modul 1: Unattached Disks ---
+# (Der Rest des Skripts bleibt exakt gleich, da er die oben definierten Variablen verwendet)
+if [ "$NUM_DISKS" -gt 0 ]; then
+    for i in $(seq 1 $NUM_DISKS); do
+        echo -e "disk-unattached-mock-$i\trg-mock-data\t128\twesteurope" >> analysis-unattached-disks.tsv
+    done
+    echo "   - Created 'analysis-unattached-disks.tsv' with $NUM_DISKS entries."
+else
+    touch analysis-unattached-disks.tsv
+    echo "   - Created empty 'analysis-unattached-disks.tsv'."
+fi
 
-# Fügt den Footer hinzu.
-echo "---" >> $OUTPUT_FILE
-echo "*Dieser Report wurde automatisch am $(date) generiert.*" >> $OUTPUT_FILE
+# (Restliche Module folgen hier unverändert...)
+# --- Modul 2: Unassociated Public IPs ---
+if [ "$NUM_IPS" -gt 0 ]; then
+    for i in $(seq 1 $NUM_IPS); do
+        echo -e "pip-unassociated-mock-$i\trg-mock-data\t20.10.20.$i\twesteurope" >> analysis-unassociated-public-ips.tsv
+    done
+    echo "   - Created 'analysis-unassociated-public-ips.tsv' with $NUM_IPS entries."
+else
+    touch analysis-unassociated-public-ips.tsv
+    echo "   - Created empty 'analysis-unassociated-public-ips.tsv'."
+fi
 
-echo "Finaler Report '$OUTPUT_FILE' wurde erfolgreich erstellt."
+# --- Modul 3: Old Snapshots ---
+if [ "$NUM_SNAPSHOTS" -gt 0 ]; then
+    for i in $(seq 1 $NUM_SNAPSHOTS); do
+        echo -e "snapshot-old-mock-$i\trg-mock-data\t256\teastus" >> analysis-old-snapshots.tsv
+    done
+    echo "   - Created 'analysis-old-snapshots.tsv' with $NUM_SNAPSHOTS entries."
+else
+    touch analysis-old-snapshots.tsv
+    echo "   - Created empty 'analysis-old-snapshots.tsv'."
+fi
+
+# --- Modul 4: Azure Advisor Recommendations ---
+if [ "$((NUM_ADVISOR_HIGH_AVAILABILITY + NUM_ADVISOR_COST))" -gt 0 ]; then
+    for i in $(seq 1 $NUM_ADVISOR_HIGH_AVAILABILITY); do
+        echo -e "Enable read-access geo-redundant storage\t/subscriptions/sub-id/resourceGroups/rg-mock-data/providers/Microsoft.Storage/storageAccounts/mockstorage$i\tHighAvailability" >> analysis-azure-advisor-recommendations.tsv
+    done
+    for i in $(seq 1 $NUM_ADVISOR_COST); do
+        echo -e "Right-size or shutdown underutilized virtual machines\t/subscriptions/sub-id/resourceGroups/rg-mock-data/providers/Microsoft.Compute/virtualMachines/mock-vm$i\tCost" >> analysis-azure-advisor-recommendations.tsv
+    done
+    echo "   - Created 'analysis-azure-advisor-recommendations.tsv' with $((NUM_ADVISOR_HIGH_AVAILABILITY + NUM_ADVISOR_COST)) entries."
+else
+    touch analysis-azure-advisor-recommendations.tsv
+    echo "   - Created empty 'analysis-azure-advisor-recommendations.tsv'."
+fi
+
+echo "✅ Mock data generation complete."
