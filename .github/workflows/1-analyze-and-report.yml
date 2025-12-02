@@ -24,13 +24,6 @@ jobs:
       - name: 'Checkout code'
         uses: actions/checkout@v3
 
-      # --- NEUER SCHRITT: Konfigurationsdatei einlesen ---
-      - name: 'Read configuration file'
-        id: config
-        uses: joshjohanning/json-to-outputs@v1
-        with:
-          file: 'finops.config.json'
-
       - name: 'Azure Login'
         uses: azure/login@v1
         with:
@@ -38,13 +31,19 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      # --------------------------------------------------------------------
+      # ANALYSE-MODULE
+      # Jeder der folgenden Schritte ist ein eigenständiges Analyse-Modul.
+      # Die Ausführung wird über die 'finops.config.json'-Datei gesteuert.
+      # --------------------------------------------------------------------
+
       - name: 'Module: Find unattached disks'
         # Läuft nur, wenn in der config "enabled": true ist.
-        if: steps.config.outputs['analysis_modules.unattached_disks.enabled'] == 'true'
+        if: $(jq -r '.analysis_modules.unattached_disks.enabled' finops.config.json) == 'true'
         run: |
           # Erstellt den JMESPath-Filter für ausgeschlossene Ressourcengruppen
           EXCLUSION_FILTER=""
-          for rg in $(echo '${{ steps.config.outputs['global_settings.excluded_resource_groups'] }}' | jq -r '.[]' 2>/dev/null); do
+          for rg in $(jq -r '.global_settings.excluded_resource_groups[]' finops.config.json); do
             EXCLUSION_FILTER+="&& resourceGroup!='$rg'"
           done
           
@@ -52,10 +51,10 @@ jobs:
           echo "Found $(wc -l < analysis-unattached-disks.tsv) unattached disks."
 
       - name: 'Module: Find unassociated public IPs'
-        if: steps.config.outputs['analysis_modules.unassociated_public_ips.enabled'] == 'true'
+        if: $(jq -r '.analysis_modules.unassociated_public_ips.enabled' finops.config.json) == 'true'
         run: |
           EXCLUSION_FILTER=""
-          for rg in $(echo '${{ steps.config.outputs['global_settings.excluded_resource_groups'] }}' | jq -r '.[]' 2>/dev/null); do
+          for rg in $(jq -r '.global_settings.excluded_resource_groups[]' finops.config.json); do
             EXCLUSION_FILTER+="&& resourceGroup!='$rg'"
           done
 
@@ -63,13 +62,14 @@ jobs:
           echo "Found $(wc -l < analysis-unassociated-public-ips.tsv) unassociated public IPs."
 
       - name: 'Module: Find old snapshots'
-        if: steps.config.outputs['analysis_modules.old_snapshots.enabled'] == 'true'
+        if: $(jq -r '.analysis_modules.old_snapshots.enabled' finops.config.json) == 'true'
         run: |
-          RETENTION_DAYS=${{ steps.config.outputs['analysis_modules.old_snapshots.retention_days'] }}
+          # Liest die Tage direkt aus der Datei mit jq
+          RETENTION_DAYS=$(jq -r '.analysis_modules.old_snapshots.retention_days' finops.config.json)
           cutoff_date=$(date -d "-$RETENTION_DAYS days" -u +'%Y-%m-%dT%H:%M:%SZ')
           
           EXCLUSION_FILTER=""
-          for rg in $(echo '${{ steps.config.outputs['global_settings.excluded_resource_groups'] }}' | jq -r '.[]' 2>/dev/null); do
+          for rg in $(jq -r '.global_settings.excluded_resource_groups[]' finops.config.json); do
             EXCLUSION_FILTER+="&& resourceGroup!='$rg'"
           done
 
@@ -77,13 +77,17 @@ jobs:
           echo "Found $(wc -l < analysis-old-snapshots.tsv) snapshots older than $RETENTION_DAYS days."
 
       - name: 'Module: Get Azure Advisor recommendations'
-        if: steps.config.outputs['analysis_modules.azure_advisor.enabled'] == 'true'
+        if: $(jq -r '.analysis_modules.azure_advisor.enabled' finops.config.json) == 'true'
         run: |
           # Baut die Kategorien für den Befehl zusammen
-          CATEGORIES=$(echo '${{ steps.config.outputs['analysis_modules.azure_advisor.categories'] }}' | jq -r '. | join(" ")' 2>/dev/null)
+          CATEGORIES=$(jq -r '.analysis_modules.azure_advisor.categories | join(" ")' finops.config.json)
 
           az advisor recommendation list --category $CATEGORIES --query "[].{Description:shortDescription.problem, Resource:resourceMetadata.resourceId, Category:category}" --output tsv > analysis-azure-advisor-recommendations.tsv || true
           echo "Found $(wc -l < analysis-azure-advisor-recommendations.tsv) Advisor recommendations for categories: $CATEGORIES."
+
+      # --------------------------------------------------------------------
+      # WORKFLOW-ABSCHLUSS
+      # --------------------------------------------------------------------
 
       - name: 'Upload analysis results as artifact'
         uses: actions/upload-artifact@v4
