@@ -11,11 +11,6 @@ on:
   workflow_dispatch:
   workflow_call:
 
-permissions:
-  id-token: none
-  contents: read
-
-
 jobs:
   # ====================================================================
   # JOB 1: ANALYZE

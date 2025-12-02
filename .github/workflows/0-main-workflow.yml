@@ -11,6 +11,10 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   # ====================================================================
   # JOB 1: LINTING (Nummeriert für korrekte UI-Sortierung)
