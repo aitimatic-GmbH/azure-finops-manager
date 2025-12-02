@@ -89,7 +89,7 @@ jobs:
         run: |
           CATEGORIES=$(jq -r '.analysis_modules.azure_advisor.categories | join(" ")' finops.config.json)
 
-          az advisor recommendation list --category $CATEGORIES --query "[].{Description:shortDescription.problem, Resource:resourceMetadata.resourceId, Category:category}" --output tsv > analysis-azure-advisor-recommendations.tsv || true
+          az advisor recommendation list --category "$CATEGORIES" --query "[].{Description:shortDescription.problem, Resource:resourceMetadata.resourceId, Category:category}" --output tsv > analysis-azure-advisor-recommendations.tsv || true
           echo "Found $(wc -l < analysis-azure-advisor-recommendations.tsv) Advisor recommendations for categories: \"$CATEGORIES\"."
 
       # --------------------------------------------------------------------
