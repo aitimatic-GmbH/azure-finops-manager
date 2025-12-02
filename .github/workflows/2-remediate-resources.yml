@@ -40,7 +40,7 @@ jobs:
     if: github.event_name == 'push'
     steps:
       - name: 'Azure Login Test (Privileged)'
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_WRITE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_WRITE_TENANT_ID }}
@@ -74,7 +74,7 @@ jobs:
           exit 1
 
       - name: 'Checkout code'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
 
       - name: 'Download analysis results from the specified run'
         uses: actions/download-artifact@v4
@@ -83,7 +83,7 @@ jobs:
           run-id: ${{ github.event.inputs.analysis_run_id }}
 
       - name: 'Azure Login (Privileged)'
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_WRITE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_WRITE_TENANT_ID }}

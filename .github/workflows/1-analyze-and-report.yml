@@ -22,10 +22,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 'Checkout code'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
+
+      - name: 'Read configuration from finops.config.json'
+        id: config
+        run: |
+          echo "unattached_disks_enabled=$(jq -r '.analysis_modules.unattached_disks.enabled' finops.config.json)" >> $GITHUB_OUTPUT
+          echo "unassociated_public_ips_enabled=$(jq -r '.analysis_modules.unassociated_public_ips.enabled' finops.config.json)" >> $GITHUB_OUTPUT
+          echo "old_snapshots_enabled=$(jq -r '.analysis_modules.old_snapshots.enabled' finops.config.json)" >> $GITHUB_OUTPUT
+          echo "azure_advisor_enabled=$(jq -r '.analysis_modules.azure_advisor.enabled' finops.config.json)" >> $GITHUB_OUTPUT
 
       - name: 'Azure Login'
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -38,10 +46,9 @@ jobs:
       # --------------------------------------------------------------------
 
       - name: 'Module: Find unattached disks'
-        # Läuft nur, wenn in der config "enabled": true ist.
-        if: $(jq -r '.analysis_modules.unattached_disks.enabled' finops.config.json) == 'true'
+        # KORRIGIERTE IF-BEDINGUNG: Greift auf den Output des 'config'-Schritts zu
+        if: steps.config.outputs.unattached_disks_enabled == 'true'
         run: |
-          # Erstellt den JMESPath-Filter für ausgeschlossene Ressourcengruppen
           EXCLUSION_FILTER=""
           for rg in $(jq -r '.global_settings.excluded_resource_groups[]' finops.config.json); do
             EXCLUSION_FILTER+="&& resourceGroup!='$rg'"
@@ -51,7 +58,7 @@ jobs:
           echo "Found $(wc -l < analysis-unattached-disks.tsv) unattached disks."
 
       - name: 'Module: Find unassociated public IPs'
-        if: $(jq -r '.analysis_modules.unassociated_public_ips.enabled' finops.config.json) == 'true'
+        if: steps.config.outputs.unassociated_public_ips_enabled == 'true'
         run: |
           EXCLUSION_FILTER=""
           for rg in $(jq -r '.global_settings.excluded_resource_groups[]' finops.config.json); do
@@ -62,9 +69,8 @@ jobs:
           echo "Found $(wc -l < analysis-unassociated-public-ips.tsv) unassociated public IPs."
 
       - name: 'Module: Find old snapshots'
-        if: $(jq -r '.analysis_modules.old_snapshots.enabled' finops.config.json) == 'true'
+        if: steps.config.outputs.old_snapshots_enabled == 'true'
         run: |
-          # Liest die Tage direkt aus der Datei mit jq
           RETENTION_DAYS=$(jq -r '.analysis_modules.old_snapshots.retention_days' finops.config.json)
           cutoff_date=$(date -d "-$RETENTION_DAYS days" -u +'%Y-%m-%dT%H:%M:%SZ')
           
@@ -77,9 +83,8 @@ jobs:
           echo "Found $(wc -l < analysis-old-snapshots.tsv) snapshots older than $RETENTION_DAYS days."
 
       - name: 'Module: Get Azure Advisor recommendations'
-        if: $(jq -r '.analysis_modules.azure_advisor.enabled' finops.config.json) == 'true'
+        if: steps.config.outputs.azure_advisor_enabled == 'true'
         run: |
-          # Baut die Kategorien für den Befehl zusammen
           CATEGORIES=$(jq -r '.analysis_modules.azure_advisor.categories | join(" ")' finops.config.json)
 
           az advisor recommendation list --category $CATEGORIES --query "[].{Description:shortDescription.problem, Resource:resourceMetadata.resourceId, Category:category}" --output tsv > analysis-azure-advisor-recommendations.tsv || true
@@ -113,7 +118,7 @@ jobs:
 
     steps:
       - name: 'Checkout code'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
 
       - name: 'Download analysis results'
         uses: actions/download-artifact@v4
