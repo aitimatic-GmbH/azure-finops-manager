@@ -8,5 +8,5 @@ Thumbs.db
 
 # Local environment files
 .env
-*.local
+local.*
 bin/*

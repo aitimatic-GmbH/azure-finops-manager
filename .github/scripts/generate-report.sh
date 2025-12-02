@@ -1,87 +1,89 @@
 #!/bin/bash
 
 # ==============================================================================
-# create-mock-data.sh
+# generate-report.sh
 #
-# Zweck: Erstellt gefälschte Analyse-Ergebnisdateien (.tsv) für Mock Tests.
-#        Die Anzahl der Einträge kann über Umgebungsvariablen gesteuert werden.
-#
-# Anwendung (Lokal):
-#   # Mit Standardwerten:
-#   bash .github/scripts/create-mock-data.sh
-#
-#   # Mit eigenen Werten:
-#   NUM_DISKS=5 NUM_IPS=0 ./github/scripts/create-mock-data.sh
+# Zweck: Liest die analyse-*.tsv Dateien und erstellt einen sauberen
+#        Markdown-Report (report.md).
 # ==============================================================================
 
-# --- Konfiguration ---
-# Liest Umgebungsvariablen. Falls nicht gesetzt, werden die Standardwerte (nach :-) verwendet.
-# Die Namen sind an die GitHub Repository Variables angepasst (MOCK_...).
-NUM_DISKS=${MOCK_NUM_DISKS:-3}
-NUM_IPS=${MOCK_NUM_IPS:-2}
-NUM_SNAPSHOTS=${MOCK_NUM_SNAPSHOTS:-4}
-NUM_ADVISOR_HIGH_AVAILABILITY=${MOCK_NUM_ADVISOR_HA:-1}
-NUM_ADVISOR_COST=${MOCK_NUM_ADVISOR_COST:-2}
+# --- Initialisierung ---
+REPORT_FILE="report.md"
 
-# --- Start ---
-echo "🚀 Generating mock data files with the following configuration:"
-echo "   - Unattached Disks: $NUM_DISKS"
-echo "   - Unassociated IPs: $NUM_IPS"
-echo "   - Old Snapshots: $NUM_SNAPSHOTS"
-echo "   - Advisor (HA): $NUM_ADVISOR_HIGH_AVAILABILITY"
-echo "   - Advisor (Cost): $NUM_ADVISOR_COST"
+# Erstellt die Kopfzeile des Reports
+cat > $REPORT_FILE << EOF
+# Kosten-Optimierungs-Report
+Dieser Report fasst die Ergebnisse der automatisierten FinOps-Analyse zusammen.
+EOF
 
-# Lösche alte Mock-Dateien, falls vorhanden
-rm -f analysis-*.tsv
-echo "   - Cleaned up old files."
+# --- Hilfsfunktion zum Erstellen einer Tabelle ---
+# Diese Funktion macht den Code sauberer und vermeidet Wiederholungen.
+#
+# Verwendung: create_table "Titel" "Header" "tsv_file"
+# Beispiel: create_table "Verwaiste Festplatten" "| Name | Resource Group | Size (GB) | Location |" "analysis-unattached-disks.tsv"
+#
+create_table() {
+    local title="$1"
+    local header="$2"
+    local file="$3"
+    
+    # Prüfen, ob die Datei existiert und nicht leer ist
+    if [ -s "$file" ]; then
+        echo "" >> $REPORT_FILE
+        echo "## $title" >> $REPORT_FILE
+        echo "" >> $REPORT_FILE
+        echo "$header" >> $REPORT_FILE
+        
+        # Erzeugt die korrekte Trennlinie basierend auf der Anzahl der Spalten im Header
+        local num_columns=$(echo "$header" | awk -F'|' '{print NF-2}')
+        local separator="| $(printf -- '-%.0s' {1..10}) "
+        local full_separator=""
+        for ((i=1; i<=num_columns; i++)); do
+            full_separator+="$separator"
+        done
+        full_separator+="|"
+        echo "$full_separator" >> $REPORT_FILE
 
-# --- Modul 1: Unattached Disks ---
-# (Der Rest des Skripts bleibt exakt gleich, da er die oben definierten Variablen verwendet)
-if [ "$NUM_DISKS" -gt 0 ]; then
-    for i in $(seq 1 $NUM_DISKS); do
-        echo -e "disk-unattached-mock-$i\trg-mock-data\t128\twesteurope" >> analysis-unattached-disks.tsv
-    done
-    echo "   - Created 'analysis-unattached-disks.tsv' with $NUM_DISKS entries."
-else
-    touch analysis-unattached-disks.tsv
-    echo "   - Created empty 'analysis-unattached-disks.tsv'."
-fi
+        # Fügt die Datenzeilen hinzu, indem jede Zeile mit "|" umschlossen und die Tabs durch "|" ersetzt werden
+        while IFS= read -r line; do
+            echo "| $line |" | sed 's/\t/ | /g' >> $REPORT_FILE
+        done < "$file"
+    else
+        # Gibt eine freundliche Nachricht aus, wenn keine Ergebnisse gefunden wurden
+        echo "" >> $REPORT_FILE
+        echo "## $title" >> $REPORT_FILE
+        echo "" >> $REPORT_FILE
+        echo "*✅ Keine relevanten Ressourcen in dieser Kategorie gefunden.*" >> $REPORT_FILE
+    fi
+}
 
-# (Restliche Module folgen hier unverändert...)
-# --- Modul 2: Unassociated Public IPs ---
-if [ "$NUM_IPS" -gt 0 ]; then
-    for i in $(seq 1 $NUM_IPS); do
-        echo -e "pip-unassociated-mock-$i\trg-mock-data\t20.10.20.$i\twesteurope" >> analysis-unassociated-public-ips.tsv
-    done
-    echo "   - Created 'analysis-unassociated-public-ips.tsv' with $NUM_IPS entries."
-else
-    touch analysis-unassociated-public-ips.tsv
-    echo "   - Created empty 'analysis-unassociated-public-ips.tsv'."
-fi
+# --- Tabellen erstellen ---
+# Ruft die Hilfsfunktion für jede Analyse-Datei auf.
 
-# --- Modul 3: Old Snapshots ---
-if [ "$NUM_SNAPSHOTS" -gt 0 ]; then
-    for i in $(seq 1 $NUM_SNAPSHOTS); do
-        echo -e "snapshot-old-mock-$i\trg-mock-data\t256\teastus" >> analysis-old-snapshots.tsv
-    done
-    echo "   - Created 'analysis-old-snapshots.tsv' with $NUM_SNAPSHOTS entries."
-else
-    touch analysis-old-snapshots.tsv
-    echo "   - Created empty 'analysis-old-snapshots.tsv'."
-fi
+create_table "Verwaiste Festplatten" \
+             "| Name | Resource Group | Size (GB) | Location |" \
+             "analysis-unattached-disks.tsv"
 
-# --- Modul 4: Azure Advisor Recommendations ---
-if [ "$((NUM_ADVISOR_HIGH_AVAILABILITY + NUM_ADVISOR_COST))" -gt 0 ]; then
-    for i in $(seq 1 $NUM_ADVISOR_HIGH_AVAILABILITY); do
-        echo -e "Enable read-access geo-redundant storage\t/subscriptions/sub-id/resourceGroups/rg-mock-data/providers/Microsoft.Storage/storageAccounts/mockstorage$i\tHighAvailability" >> analysis-azure-advisor-recommendations.tsv
-    done
-    for i in $(seq 1 $NUM_ADVISOR_COST); do
-        echo -e "Right-size or shutdown underutilized virtual machines\t/subscriptions/sub-id/resourceGroups/rg-mock-data/providers/Microsoft.Compute/virtualMachines/mock-vm$i\tCost" >> analysis-azure-advisor-recommendations.tsv
-    done
-    echo "   - Created 'analysis-azure-advisor-recommendations.tsv' with $((NUM_ADVISOR_HIGH_AVAILABILITY + NUM_ADVISOR_COST)) entries."
-else
-    touch analysis-azure-advisor-recommendations.tsv
-    echo "   - Created empty 'analysis-azure-advisor-recommendations.tsv'."
-fi
+create_table "Ungenutzte öffentliche IPs" \
+             "| Name | Resource Group | IP Address | Location |" \
+             "analysis-unassociated-public-ips.tsv"
 
-echo "✅ Mock data generation complete."
+# Holt die Aufbewahrungstage aus der Konfigurationsdatei für einen dynamischen Titel
+RETENTION_DAYS=$(jq -r '.analysis_modules.old_snapshots.retention_days' finops.config.json 2>/dev/null || echo "90")
+create_table "Alte Snapshots (>${RETENTION_DAYS} Tage)" \
+             "| Name | Resource Group | Size (GB) | Location |" \
+             "analysis-old-snapshots.tsv"
+
+create_table "Azure Advisor Empfehlungen" \
+             "| Beschreibung | Ressource | Kategorie |" \
+             "analysis-azure-advisor-recommendations.tsv"
+
+
+# --- Fußzeile ---
+# Fügt den Zeitstempel am Ende des Reports hinzu
+echo "" >> $REPORT_FILE
+echo "---" >> $REPORT_FILE
+echo "*Dieser Report wurde automatisch am $(date) generiert.*" >> $REPORT_FILE
+
+echo "✅ Report 'report.md' wurde erfolgreich generiert."
+
