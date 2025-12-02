@@ -26,7 +26,7 @@ jobs:
     name: 'Quality Gate: Test Report Generation'
     # 'needs' muss jetzt auf die neue, nummerierte Job-ID verweisen.
     needs: lint-workflows
-    uses: ./.github/workflows/3-mock-test-report.yml
+    uses: ./.github/workflows/3-mock-test-report-generation.yml
     secrets: inherit
 
   # ====================================================================
