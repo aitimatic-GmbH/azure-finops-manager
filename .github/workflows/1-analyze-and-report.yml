@@ -1,17 +1,20 @@
 # .github/workflows/1-analyze-and-report.yml
 
-name: '1 - Analyze and Report'
+name: 'Reuseable: Analyze and Report'
 
+# ====================================================================
+# TRIGGER:
+# 1. Kann von einem anderen Workflow aufgerufen werden (für die CI-Pipeline).
+# 2. Kann manuell gestartet werden
+# ====================================================================
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - feature/**
-      - main
+  workflow_call:
 
 permissions:
   id-token: write
   contents: read
+
 
 jobs:
   # ====================================================================

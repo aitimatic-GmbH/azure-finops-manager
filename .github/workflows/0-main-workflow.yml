@@ -1,0 +1,40 @@
+# .github/workflows/0-main-workflow.yml
+
+name: '0 - Main CI Workflow'
+
+on:
+  push:
+    branches-ignore:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  # ====================================================================
+  # JOB 1: LINTING (Nummeriert für korrekte UI-Sortierung)
+  # ====================================================================
+  lint-workflows: # JOB-ID wurde umbenannt
+    name: 'Quality Gate: Linting'
+    uses: ./.github/workflows/2-lint-workflows.yml
+
+  # ====================================================================
+  # JOB 2: MOCK-DATEN-TEST (Nummeriert für korrekte UI-Sortierung)
+  # ====================================================================
+  test-report: # JOB-ID wurde umbenannt
+    name: 'Quality Gate: Test Report Generation'
+    # 'needs' muss jetzt auf die neue, nummerierte Job-ID verweisen.
+    needs: lint-workflows
+    uses: ./.github/workflows/3-mock-test-report.yml
+    secrets: inherit
+
+  # ====================================================================
+  # JOB 3: AZURE-ANALYSE (Nummeriert für korrekte UI-Sortierung)
+  # ====================================================================
+  analyze-and-report: # JOB-ID wurde umbenannt
+    name: 'Main Task: Analyze and Report'
+    # 'needs' muss jetzt auf die neuen, nummerierten Job-IDs verweisen.
+    needs: [lint-workflows, test-report]
+    uses: ./.github/workflows/1-analyze-and-report.yml
+    secrets: inherit
