@@ -1,30 +1,36 @@
-# DevOpsMaintenance
-# Managed Service: FinOps & Ressourcen-Optimierung
+# Managed FinOps Service für Azure
 
-Dieses Repository enthält die technischen Grundlagen für den "Managed FinOps & Ressourcen-Optimierung"-Service. Das Ziel dieses Services ist es, die Cloud-Kosten für unsere Kunden durch **automatisierte GitHub Actions Workflows** proaktiv zu senken.
+Dieses Repository enthält die technischen Grundlagen für den "Managed FinOps & Ressourcen-Optimierung"-Service. Das Ziel dieses Services ist es, die Cloud-Kosten für unsere Kunden durch **automatisierte und konfigurierbare GitHub Actions Workflows** proaktiv zu senken.
 
 ## Strategischer Ansatz
 
-Die Lösung ist als eine Reihe von wiederverwendbaren und konfigurierbaren GitHub Actions Workflows aufgebaut.
-Die gesamte Logik für Analyse und Reporting ist in den Workflow-Dateien gekapselt, um maximale Wiederholbarkeit und Sicherheit zu gewährleisten.
+Die Lösung ist als ein einziger, robuster GitHub Actions Workflow aufgebaut, der sich über eine zentrale Konfigurationsdatei (`finops.config.json`) steuern lässt. Dieser Ansatz gewährleistet maximale Sicherheit, Wiederholbarkeit und einfache Anpassbarkeit für den Kunden.
 
 **Aktueller Fokus:** Die Entwicklung konzentriert sich derzeit auf die Implementierung für **Microsoft Azure**.
 
-## Kern-Workflows
+## Kern-Workflow: `1-analyze-and-report.yml`
 
-- **`1-analyze-resources.yml`**: Dieser Workflow wird manuell oder zeitgesteuert ausgelöst. Er verbindet sich sicher mit der Azure-Subscription des Kunden, führt eine Analyse zur Identifizierung von Einsparpotenzialen durch (z.B. ungenutzte Disks, überdimensionierte VMs) und speichert die Rohdaten als sicheres Workflow-Artifact.
-- **`2-generate-report.yml`**: Dieser Workflow verarbeitet die vom Analyse-Workflow erstellten Artifacts und generiert einen management-tauglichen Kosten-Optimierungs-Report im Markdown-Format.
+Dieser zentrale Workflow führt den gesamten Prozess in zwei logischen, voneinander getrennten Jobs aus:
+
+1.  **`analyze` Job**:
+    *   Wird manuell (`workflow_dispatch`) oder bei Code-Änderungen (`push`) ausgelöst.
+    *   Verbindet sich sicher über eine passwortlose OIDC-Verbindung mit der Azure-Subscription des Kunden (nur Leserechte).
+    *   Führt die in `finops.config.json` aktivierten Analyse-Module aus (z.B. ungenutzte Disks, alte Snapshots, Advisor-Empfehlungen).
+    *   Speichert die Rohdaten als sicheres Workflow-Artefakt.
+
+2.  **`report` Job**:
+    *   Startet automatisch nach dem erfolgreichen Abschluss des `analyze`-Jobs.
+    *   Lädt die Analyse-Rohdaten herunter.
+    *   Generiert einen management-tauglichen Kosten-Optimierungs-Report im Markdown-Format.
+
+Ein separater Workflow, **`2-remediate-resources.yml`**, existiert für die optionale, manuelle Bereinigung der gefundenen Ressourcen und erfordert separate, erhöhte Berechtigungen.
 
 ## Quick Start (Für einen neuen Kunden)
 
-Die Implementierung des Services erfolgt vollständig über GitHub Actions.
-
-1.  **Kunden-Onboarding:** Folgen Sie der Anleitung im **[Customer Onboarding Guide](./docs/1-customer-onboarding.md)**, um die notwendigen Azure-Credentials als GitHub Secrets für das Repository zu konfigurieren.
-2.  **Analyse starten:** Lösen Sie den Workflow `1-analyze-resources.yml` manuell über die GitHub Actions UI aus ("Run workflow").
-3.  **Report generieren:** Nach erfolgreichem Abschluss des Analyse-Workflows wird der Report-Workflow `2-generate-report.yml` automatisch (oder manuell) gestartet.
-4.  **Ergebnis prüfen:** Der fertige Report wird als Artifact des zweiten Workflows zum Download bereitgestellt.
-
-Detaillierte Anweisungen zur Konfiguration der Secrets und der Workflow-Parameter finden Sie im **[Customer Onboarding Guide](./docs/1-customer-onboarding.md)**.
+1.  **Azure-Anmeldedaten einrichten:** Folgen Sie der Anleitung im **[Customer Onboarding Guide](./docs/1-customer-onboarding.md)**, um die notwendigen Azure-Credentials als GitHub Secrets zu konfigurieren.
+2.  **Analyse konfigurieren:** Passen Sie die Datei **`finops.config.json`** an Ihre Bedürfnisse an. Aktivieren/deaktivieren Sie Module und definieren Sie Ressourcengruppen, die von der Analyse ausgeschlossen werden sollen.
+3.  **Workflow starten:** Lösen Sie den Workflow **`1 - Analyze and Report`** manuell über die GitHub Actions UI aus ("Run workflow").
+4.  **Ergebnis prüfen:** Nach Abschluss des Laufs finden Sie den fertigen Bericht (`finops-cost-report.md`) im Artefakt-Bereich des Workflow-Laufs zum Download.
 
 ---
-**Status:** In Entwicklung | **Primäre Plattform:** Azure |
+**Status:** In Entwicklung | **Primäre Plattform:** Azure | **Konfiguration:** `finops.config.json`
