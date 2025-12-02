@@ -2,11 +2,26 @@
 
 Dieses Dokument beschreibt die notwendigen Schritte, um eine sichere, passwortlose Verbindung (via OpenID Connect) zwischen diesem GitHub-Repository und einer Azure Subscription herzustellen.
 
-**Ziel:** Einen "Service Principal" in Azure erstellen und ihm erlauben, sich von GitHub Actions aus zu authentifizieren.
+**Ziel:** Am Ende dieser Anleitung ist der Service bereit, Kostenanalysen durchzuführen, Berichte zu erstellen und optional auch Korrekturmaßnahmen (Remediation) auszuführen.
 
+*   **Teil A: Analyse-Zugriff einrichten (Leseberechtigung)**
+    1.  Einen Service Principal mit **Leserechten** in Azure erstellen (via Cloud Shell, lokaler CLI oder Portal).
+    2.  Die Lese-Anmeldedaten als GitHub Secrets speichern.
+
+*   **Teil B: Analyse konfigurieren**
+    1.  Die `finops.config.json` anpassen, um Analyse-Module zu steuern und Ressourcengruppen auszuschließen.
+
+*   **Teil C: Remediation-Zugriff einrichten (Schreibberechtigung, Optional)**
+    1.  Einen **zweiten**, separaten Service Principal mit **Schreibrechten** erstellen.
+    2.  Die Schreib-Anmeldedaten als separate GitHub Secrets speichern.
+
+*   **Teil D: Erster Testlauf**
+    1.  Den Analyse-Workflow manuell starten und das Ergebnis überprüfen.
 ---
+## Teil A: Analyse-Zugriff einrichten (Leseberechtigung)
+Zuerst erstellen wir eine sichere, passwortlose Verbindung (via OpenID Connect) für den Analyse-Workflow.
 
-## Teil A: Konfiguration in Microsoft Azure
+**Anforderung:** Sie benötigen ausreichende Berechtigungen in der Azure Subscription (z.B. "Owner" oder "User Access Administrator").
 
 Für die Einrichtung in Azure gibt es drei Wege, je nach Ihrem technischen Kenntnisstand und Ihren bevorzugten Werkzeugen. Wählen Sie den Weg, der am besten zu Ihnen passt.
 
@@ -31,30 +46,17 @@ Wir benötigen die ID Ihrer Azure Subscription. Führen Sie den folgenden Befehl
 az account show --query "{subscriptionId:id, name:name}"
 
 ```
-Bewahren Sie diese subscriptionId für später auf.
+Bewahren Sie diese subscription Id für später auf.
 
 #### 3: Service Principal erstellen
 
-Ein Service Principal ist eine Identität für Anwendungen. Unser GitHub-Workflow wird diese Identität annehmen.
-
-1\. Definieren Sie einen Namen für Ihren neuen Service Principal. Er sollte auf das Projekt hinweisen.
+1\. Ersetzen Sie `<SUBSCRIPTION_ID>` mit Ihrer ID und `<SERVICE_PRINCIPAL_NAME>` mit einem eindeutigen Namen (z.B. `github-finops-reader`).
 
 ```bash
-# Passen Sie den Namen an
-SERVICE_PRINCIPAL_NAME="github-finops-workflow"
-
+az ad sp create-for-rbac --name <SERVICE_PRINCIPAL_NAME> --role "Reader" --scopes "/subscriptions/<SUBSCRIPTION_ID>"
 ```
 
-2\. Führen Sie den folgenden Befehl aus, um den Service Principal zu erstellen.
-Bash
-
-````bash
-az ad sp create-for-rbac --name $SERVICE_PRINCIPAL_NAME --role reader --scopes /subscriptions/IHRE_SUBSCRIPTION_ID
-
-````
-Ersetzen Sie IHRE_SUBSCRIPTION_ID durch die ID, die Sie in Schritt 2 kopiert haben.
-
-3\. Wichtiger Output: Der Befehl erzeugt einen JSON-Output. Kopieren Sie die Werte für appId (das ist Ihre Client ID) und tenant (das ist Ihre Tenant ID).
+2\. **Wichtiger Output:** Der Befehl erzeugt einen JSON-Output. Kopieren Sie die Werte für `appId` (Ihre Client ID) und `tenant` (Ihre Tenant ID). Das `password` wird ignoriert.
 
 ````JSON
 {
@@ -83,10 +85,10 @@ OBJECT_ID=$(az ad sp list --display-name $SERVICE_PRINCIPAL_NAME --query "[].id"
 GITHUB_REPO="IHR_GITHUB_ORG/IHR_REPO_NAME"
 ````
 
-3\. Erstellen Sie die "Federated Credential" (die eigentliche Vertrauensstellung). Dieser Befehl erlaubt es jedem Branch in Ihrem Repository, sich zu authentifizieren.
+3\. Erstellen Sie die "Federated Credential" (die eigentliche Vertrauensstellung). Dieser Befehl erlaubt es Main Branch in Ihrem Repository, sich zu authentifizieren.
 
 ````Bash
-az ad app federated-credential create --id $OBJECT_ID --parameters '{"name":"github-branch-creds","issuer":"https://token.actions.githubusercontent.com","subject":"repo:'$GITHUB_REPO':ref:refs/heads/*","description":"GitHub Actions on any branch","audiences":["api://AzureADTokenExchange"]}'
+az ad app federated-credential create --id $OBJECT_ID --parameters '{"name":"github-branch-creds","issuer":"https://token.actions.githubusercontent.com","subject":"repo:'$GITHUB_REPO':ref:refs/heads/main","description":"GitHub Actions on main branch","audiences":["api://AzureADTokenExchange"]}'
 
 ````
 ## Weg 2: Lokale Azure CLI
@@ -152,7 +154,32 @@ Ihr Repository ist jetzt bereit. Sie können den Workflow 1 - Analyze Azure Reso
 
 ---
 
-## Teil B: Einrichtung der Credentials für Remediation (Schreibzugriff)
+## Teil B: Analyse konfigurieren
+
+Passen Sie die Datei `finops.config.json` im Hauptverzeichnis an, um zu steuern, *was* analysiert wird.
+
+```json
+{
+  "analysis_modules": {
+    "old_snapshots": { "enabled": true, "retention_days": 90 },
+    "unattached_disks": { "enabled": true },
+    "unassociated_public_ips": { "enabled": true },
+    "azure_advisor": { "enabled": true, "categories": ["Cost", "HighAvailability"] }
+  },
+  "global_settings": {
+    "excluded_resource_groups": ["rg-core-infra", "rg-prod-databases"]
+  }
+}
+```
+
+- Module aktivieren/deaktivieren: Setzen Sie "enabled": true oder false.
+- Aufbewahrungsdauer: Ändern Sie retention_days für alte Snapshots.
+- Advisor-Kategorien: Passen Sie die Liste der categories an (Cost, Security, etc.).
+- Ressourcengruppen ausschließen: Fügen Sie Namen von RGs zu excluded_resource_groups hinzu, die ignoriert werden sollen.
+
+Committen Sie Ihre Änderungen an dieser Datei, um sie zu aktivieren.
+
+## Teil C: Einrichtung der Credentials für Remediation (Schreibzugriff)
 
 **Wichtiger Hinweis:** Dieser Teil ist **optional** und nur notwendig, wenn Sie den Remediation-Workflow (`2-remediate-resources.yml`) nutzen möchten, der aktive Änderungen (z.B. das Löschen von Ressourcen) in Ihrer Azure-Umgebung vornimmt.
 
@@ -194,3 +221,16 @@ Nachdem Sie den zweiten Service Principal erstellt haben, müssen Sie zwei neue 
 
 **Einrichtung für Remediation abgeschlossen!**
 Der Workflow `2-remediate-resources.yml` ist nun in der Lage, sich bei einem `push` für den Verbindungstest und bei einem manuellen Start für die Bereinigung sicher mit den Schreibrechten zu authentifizieren.
+
+## Teil D: Erster Testlauf
+
+Nachdem die Azure-Verbindung und die Analyse konfiguriert sind, ist es Zeit für einen Testlauf, um sicherzustellen, dass alles korrekt funktioniert.
+
+1.  **Navigieren Sie zum "Actions"-Tab** in Ihrem GitHub Repository.
+2.  Wählen Sie den Workflow **"1 - Analyze and Report"** in der linken Seitenleiste aus.
+3.  Klicken Sie auf den Button **"Run workflow"**. Ein kleines Dropdown-Menü erscheint.
+4.  Bestätigen Sie den Start, indem Sie erneut auf den grünen **"Run workflow"**-Button im Dropdown klicken.
+
+Sie können den Fortschritt des Workflows live verfolgen. Nach erfolgreichem Abschluss (ca. 2-5 Minuten) finden Sie im Artefakt-Bereich des Laufs eine Datei namens `finops-cost-report`. Laden Sie diese herunter, um den fertigen Markdown-Bericht zu sehen.
+
+**Herzlichen Glückwunsch! Der Managed FinOps Service ist nun vollständig für Ihre Umgebung konfiguriert und einsatzbereit.**
