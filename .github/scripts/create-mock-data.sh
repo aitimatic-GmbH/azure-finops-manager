@@ -3,30 +3,40 @@
 # ==============================================================================
 # create-mock-data.sh
 #
-# Zweck: Erstellt gefälschte Analyse-Ergebnisdateien (.tsv) für lokale Tests
-#        des 'report'-Jobs, ohne eine Verbindung zu Azure zu benötigen.
+# Zweck: Erstellt gefälschte Analyse-Ergebnisdateien (.tsv) für Mock Tests.
+#        Die Anzahl der Einträge kann über Umgebungsvariablen gesteuert werden.
 #
-# Anwendung: Führen Sie das Skript vom Hauptverzeichnis des Projekts aus:
-#            bash .github/scripts/create-mock-data.sh
+# Anwendung (Lokal):
+#   # Mit Standardwerten:
+#   bash .github/scripts/create-mock-data.sh
+#
+#   # Mit eigenen Werten:
+#   NUM_DISKS=5 NUM_IPS=0 ./github/scripts/create-mock-data.sh
 # ==============================================================================
 
 # --- Konfiguration ---
-# Ändern Sie diese Werte, um verschiedene Szenarien zu testen (z.B. 0 für leere Reports)
-NUM_DISKS=3
-NUM_IPS=2
-NUM_SNAPSHOTS=4
-NUM_ADVISOR_HIGH_AVAILABILITY=1
-NUM_ADVISOR_COST=2
+# Liest Umgebungsvariablen. Falls nicht gesetzt, werden die Standardwerte (nach :-) verwendet.
+# Die Namen sind an die GitHub Repository Variables angepasst (MOCK_...).
+NUM_DISKS=${MOCK_NUM_DISKS:-3}
+NUM_IPS=${MOCK_NUM_IPS:-2}
+NUM_SNAPSHOTS=${MOCK_NUM_SNAPSHOTS:-4}
+NUM_ADVISOR_HIGH_AVAILABILITY=${MOCK_NUM_ADVISOR_HA:-1}
+NUM_ADVISOR_COST=${MOCK_NUM_ADVISOR_COST:-2}
 
 # --- Start ---
-echo "🚀 Generating mock data files..."
+echo "🚀 Generating mock data files with the following configuration:"
+echo "   - Unattached Disks: $NUM_DISKS"
+echo "   - Unassociated IPs: $NUM_IPS"
+echo "   - Old Snapshots: $NUM_SNAPSHOTS"
+echo "   - Advisor (HA): $NUM_ADVISOR_HIGH_AVAILABILITY"
+echo "   - Advisor (Cost): $NUM_ADVISOR_COST"
 
 # Lösche alte Mock-Dateien, falls vorhanden
 rm -f analysis-*.tsv
 echo "   - Cleaned up old files."
 
 # --- Modul 1: Unattached Disks ---
-# Format: Name, ResourceGroup, SizeGB, Location
+# (Der Rest des Skripts bleibt exakt gleich, da er die oben definierten Variablen verwendet)
 if [ "$NUM_DISKS" -gt 0 ]; then
     for i in $(seq 1 $NUM_DISKS); do
         echo -e "disk-unattached-mock-$i\trg-mock-data\t128\twesteurope" >> analysis-unattached-disks.tsv
@@ -37,8 +47,8 @@ else
     echo "   - Created empty 'analysis-unattached-disks.tsv'."
 fi
 
+# (Restliche Module folgen hier unverändert...)
 # --- Modul 2: Unassociated Public IPs ---
-# Format: Name, ResourceGroup, IPAddress, Location
 if [ "$NUM_IPS" -gt 0 ]; then
     for i in $(seq 1 $NUM_IPS); do
         echo -e "pip-unassociated-mock-$i\trg-mock-data\t20.10.20.$i\twesteurope" >> analysis-unassociated-public-ips.tsv
@@ -50,7 +60,6 @@ else
 fi
 
 # --- Modul 3: Old Snapshots ---
-# Format: Name, ResourceGroup, SizeGB, Location
 if [ "$NUM_SNAPSHOTS" -gt 0 ]; then
     for i in $(seq 1 $NUM_SNAPSHOTS); do
         echo -e "snapshot-old-mock-$i\trg-mock-data\t256\teastus" >> analysis-old-snapshots.tsv
@@ -62,7 +71,6 @@ else
 fi
 
 # --- Modul 4: Azure Advisor Recommendations ---
-# Format: Description, Resource, Category
 if [ "$((NUM_ADVISOR_HIGH_AVAILABILITY + NUM_ADVISOR_COST))" -gt 0 ]; then
     for i in $(seq 1 $NUM_ADVISOR_HIGH_AVAILABILITY); do
         echo -e "Enable read-access geo-redundant storage\t/subscriptions/sub-id/resourceGroups/rg-mock-data/providers/Microsoft.Storage/storageAccounts/mockstorage$i\tHighAvailability" >> analysis-azure-advisor-recommendations.tsv
@@ -77,5 +85,3 @@ else
 fi
 
 echo "✅ Mock data generation complete."
-echo "   You can now test the report generation script locally."
-
