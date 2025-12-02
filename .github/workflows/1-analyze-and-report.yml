@@ -27,10 +27,12 @@ jobs:
       - name: 'Read configuration from finops.config.json'
         id: config
         run: |
-          echo "unattached_disks_enabled=$(jq -r '.analysis_modules.unattached_disks.enabled' finops.config.json)" >> $GITHUB_OUTPUT
-          echo "unassociated_public_ips_enabled=$(jq -r '.analysis_modules.unassociated_public_ips.enabled' finops.config.json)" >> $GITHUB_OUTPUT
-          echo "old_snapshots_enabled=$(jq -r '.analysis_modules.old_snapshots.enabled' finops.config.json)" >> $GITHUB_OUTPUT
-          echo "azure_advisor_enabled=$(jq -r '.analysis_modules.azure_advisor.enabled' finops.config.json)" >> $GITHUB_OUTPUT
+          {
+            echo "unattached_disks_enabled=$(jq -r '.analysis_modules.unattached_disks.enabled' finops.config.json)"
+            echo "unassociated_public_ips_enabled=$(jq -r '.analysis_modules.unassociated_public_ips.enabled' finops.config.json)"
+            echo "old_snapshots_enabled=$(jq -r '.analysis_modules.old_snapshots.enabled' finops.config.json)"
+            echo "azure_advisor_enabled=$(jq -r '.analysis_modules.azure_advisor.enabled' finops.config.json)"
+          } >> "$GITHUB_OUTPUT"
 
       - name: 'Azure Login'
         uses: azure/login@v2
