@@ -29,7 +29,7 @@ jobs:
   test-python-modules: # underutilized VMs Mock Test 
     name: 'Quality Gate: Python Unit Tests'
     needs: lint-workflows
-    uses: ./.github/workflows/python-tests.yml
+    uses: ./.github/workflows/3.1-python-tests.yml
 
   test-report: # JOB-ID wurde umbenannt
     name: 'Quality Gate: Test Report Generation'
