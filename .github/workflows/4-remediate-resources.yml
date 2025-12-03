@@ -18,6 +18,7 @@ on:
           - unassociated-public-ips
           - old-snapshots
           - underutilized-vms
+          - all
       confirmation_phrase:
         description: 'Type "DELETE" to confirm the remediation action. (Not required for DRY-RUN)'
         required: false

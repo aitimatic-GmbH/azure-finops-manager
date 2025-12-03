@@ -92,15 +92,25 @@ function process_remediation() {
 # --- Aufruf der Verarbeitungs-Funktion basierend auf dem Input ---
 # Die 'case'-Anweisung steuert, welche Ressourcentypen verarbeitet werden.
 # Bei 'DRY-RUN' wird dank ';&' durch alle Blöcke gefallen ("fall-through").
+# --- Aufruf der Verarbeitungs-Funktion basierend auf dem Input ---
 case $RESOURCE_TYPE in
     "DRY-RUN")
-        # Im DRY-RUN-Modus führen wir alle process_remediation-Aufrufe nacheinander aus.
+        # Im DRY-RUN-Modus werden alle Aktionen für alle Typen simuliert.
         log_info "Executing DRY-RUN for all resource types..."
         process_remediation "analysis-unattached-disks.tsv" "Disk" 'az disk delete --name "$name" --resource-group "$group" --yes'
         process_remediation "analysis-unassociated-public-ips.tsv" "Public IP" 'az network public-ip delete --name "$name" --resource-group "$group"'
         process_remediation "analysis-old-snapshots.tsv" "Snapshot" 'az snapshot delete --name "$name" --resource-group "$group"'
         process_remediation "analysis-underutilized-vms.tsv" "Underutilized VM" 'az vm deallocate --name "$name" --resource-group "$group" --no-wait'
         ;; # Beendet den DRY-RUN Fall
+
+    "all")
+        # Im "all"-Modus werden alle Aktionen für alle Typen tatsächlich ausgeführt.
+        log_info "Executing remediation for ALL resource types..."
+        process_remediation "analysis-unattached-disks.tsv" "Disk" 'az disk delete --name "$name" --resource-group "$group" --yes'
+        process_remediation "analysis-unassociated-public-ips.tsv" "Public IP" 'az network public-ip delete --name "$name" --resource-group "$group"'
+        process_remediation "analysis-old-snapshots.tsv" "Snapshot" 'az snapshot delete --name "$name" --resource-group "$group"'
+        process_remediation "analysis-underutilized-vms.tsv" "Underutilized VM" 'az vm deallocate --name "$name" --resource-group "$group" --no-wait'
+        ;; # Beendet den "all" Fall
 
     "unattached-disks")
         process_remediation "analysis-unattached-disks.tsv" "Disk" 'az disk delete --name "$name" --resource-group "$group" --yes'
