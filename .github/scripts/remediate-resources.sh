@@ -19,9 +19,10 @@ function log_warning() {
 # --- Skript-Initialisierung ---
 LOG_FILE="remediation-log.txt"
 RESOURCE_TYPE=""
-IS_DRY_RUN=false # Neue Variable für den DRY-RUN-Modus
+IS_DRY_RUN=false
 
 # --- Argumenten-Verarbeitung ---
+# Verarbeitet die Kommandozeilen-Argumente, um den --type zu extrahieren.
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --type) RESOURCE_TYPE="$2"; shift ;;
@@ -38,10 +39,7 @@ fi
 # --- Prüfen, ob es ein DRY-RUN ist ---
 if [[ "$RESOURCE_TYPE" == "DRY-RUN" ]]; then
     IS_DRY_RUN=true
-    log_info "DRY-RUN-Modus aktiviert. Es werden keine Ressourcen gelöscht."
-    # Wir müssen den Ressourcentyp für den Report wissen, den der Benutzer eigentlich testen wollte.
-    # Hier könnten wir eine Logik hinzufügen, um das aus einem optionalen zweiten Parameter zu lesen.
-    # Fürs Erste simulieren wir einfach alle Typen.
+    log_info "DRY-RUN-Modus aktiviert. Es werden keine Ressourcen geändert."
 fi
 
 # --- Log-Datei initialisieren ---
@@ -49,44 +47,52 @@ echo "Remediation run started at $(date)" > $LOG_FILE
 echo "Selected mode: $RESOURCE_TYPE" >> $LOG_FILE
 echo "-------------------------------------------" >> $LOG_FILE
 
-# --- Haupt-Logik: Case-Statement zur Steuerung ---
-# Wir verwenden eine Funktion, um die Logik nicht zu wiederholen.
+# --- Haupt-Logik: Zentrale Funktion zur Verarbeitung ---
+# Diese Funktion verarbeitet eine gegebene TSV-Datei und führt ein Kommando-Template aus.
+# Argumente:
+# $1: Pfad zur TSV-Datei
+# $2: Anzeigename des Ressourcentyps für die Logs
+# $3: Azure CLI Kommando-Template als String. Muss '$name' und '$group' als Platzhalter enthalten.
 function process_remediation() {
     local file_path=$1
     local resource_name_singular=$2
     local az_command_template=$3
 
-    if [ ! -f "$file_path" ]; then
-        log_warning "$file_path nicht gefunden. Überspringe diesen Typ."
+    if [ ! -f "$file_path" ] || [ ! -s "$file_path" ]; then
+        log_warning "$file_path nicht gefunden oder leer. Überspringe diesen Typ."
         return
     fi
 
     log_info "Processing $resource_name_singular from $file_path..."
     
+    # Liest die TSV-Datei Zeile für Zeile.
+    # Format: name<TAB>group<TAB>... (weitere Spalten werden in 'etc' ignoriert)
     while IFS=$'\t' read -r name group etc; do
         # Ersetzt die Platzhalter im Befehls-Template mit den echten Werten.
-        # Das 'eval' ist notwendig, um die Variablen im String zu expandieren.
-        delete_command=$(eval echo $az_command_template)
+        # 'eval' ist hier sicher, da das Template im Skript hartcodiert ist.
+        action_command=$(eval echo $az_command_template)
 
         if [ "$IS_DRY_RUN" = true ]; then
             # DRY-RUN-Modus: Befehl nur ausgeben.
-            log_info "[DRY-RUN] Would execute: $delete_command"
-            echo "[DRY-RUN] SIMULATED DELETE: $resource_name_singular '$name' in RG '$group'" >> $LOG_FILE
+            log_info "[DRY-RUN] Would execute: $action_command"
+            echo "[DRY-RUN] SIMULATED ACTION: $resource_name_singular '$name' in RG '$group'" >> $LOG_FILE
         else
             # Echter Modus: Befehl ausführen.
-            log_info "Executing: $delete_command"
-            if $delete_command; then
-                echo "DELETED: $resource_name_singular '$name' in RG '$group'" >> $LOG_FILE
+            log_info "Executing: $action_command"
+            if $action_command; then
+                echo "SUCCESS: $resource_name_singular '$name' in RG '$group'" >> $LOG_FILE
             else
-                log_warning "Failed to delete $resource_name_singular $name"
+                log_warning "Failed to process $resource_name_singular $name"
                 echo "FAILED: $resource_name_singular '$name' in RG '$group'" >> $LOG_FILE
             fi
         fi
     done < "$file_path"
 }
 
-
 # --- Aufruf der Verarbeitungs-Funktion basierend auf dem Input ---
+# Die 'case'-Anweisung steuert, welche Ressourcentypen verarbeitet werden.
+# Bei 'DRY-RUN' wird dank ';&' durch alle Blöcke gefallen ("fall-through").
+# Bei einem spezifischen Typ wird nur dieser Block ausgeführt und mit 'break' beendet.
 case $RESOURCE_TYPE in
     "unattached-disks" | "DRY-RUN")
         process_remediation "analysis-unattached-disks.tsv" "Disk" 'az disk delete --name "$name" --resource-group "$group" --yes'
@@ -99,7 +105,14 @@ case $RESOURCE_TYPE in
     "old-snapshots" | "DRY-RUN")
         process_remediation "analysis-old-snapshots.tsv" "Snapshot" 'az snapshot delete --name "$name" --resource-group "$group"'
         if [[ "$RESOURCE_TYPE" != "DRY-RUN" ]]; then break; fi
-        ;;
+        ;&
+    # --- NEUER BLOCK FÜR UNTERAUSGELASTETE VMs ---
+    # Dieser Block wird ausgeführt, wenn --type 'underutilized-vms' oder 'DRY-RUN' ist.
+    "underutilized-vms" | "DRY-RUN")
+        # Ruft die zentrale Funktion mit dem passenden Kommando für die VM-Deallokierung auf.
+        process_remediation "analysis-underutilized-vms.tsv" "Underutilized VM" 'az vm deallocate --name "$name" --resource-group "$group" --no-wait'
+        if [[ "$RESOURCE_TYPE" != "DRY-RUN" ]]; then break; fi
+        ;; # Wichtig: ';;' beendet den Fall für 'DRY-RUN' hier.
     "SIMULATION-ONLY")
         log_info "SIMULATION MODE: No actions taken."
         echo "SIMULATION MODE: No actions taken." >> $LOG_FILE

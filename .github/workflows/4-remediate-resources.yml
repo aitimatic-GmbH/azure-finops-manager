@@ -1,4 +1,4 @@
-# .github/workflows/2-remediate-resources.yml
+# .github/workflows/4-remediate-resources.yml
 
 name: '4 - Remediate Azure Resources'
 
@@ -17,6 +17,7 @@ on:
           - unattached-disks
           - unassociated-public-ips
           - old-snapshots
+          - underutilized-vms
       confirmation_phrase:
         description: 'Type "DELETE" to confirm the remediation action. (Not required for DRY-RUN)'
         required: false
@@ -92,7 +93,7 @@ jobs:
       - name: 'Execute Remediation Script'
         run: |
           chmod +x .github/scripts/remediate-resources.sh
-          ./.github/scripts/remediate-resources.sh --type "${{ github.event.inputs.resource_type_to_remediate }}"
+          ./.github/scripts/remediate-resources.sh "${{ github.event.inputs.resource_type_to_remediate }}"
 
       - name: 'Upload Remediation Log'
         uses: actions/upload-artifact@v4
