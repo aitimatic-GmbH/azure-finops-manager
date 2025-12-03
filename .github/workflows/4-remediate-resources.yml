@@ -95,7 +95,7 @@ jobs:
       - name: 'Execute Remediation Script'
         run: |
           chmod +x .github/scripts/remediate-resources.sh
-          ./.github/scripts/remediate-resources.sh "${{ github.event.inputs.resource_type_to_remediate }}"
+          ./.github/scripts/remediate-resources.sh --type "${{ github.event.inputs.resource_type_to_remediate }}"
 
       - name: 'Upload Remediation Log'
         uses: actions/upload-artifact@v4
