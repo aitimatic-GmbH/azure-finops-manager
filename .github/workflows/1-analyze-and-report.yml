@@ -23,29 +23,33 @@ jobs:
         uses: actions/checkout@v6
 
       - name: 'Build Runtime Configuration from Repository Variable'
-        id: build_config
+        # Wir übergeben die Variable als Umgebungsvariable, um Shell-Expansionsprobleme zu vermeiden.
+        env:
+          CONFIG_JSON: ${{ vars.FINOPS_CONFIG_JSON }}
         run: |
-          echo "INFO: Building runtime configuration from FINOPS_CONFIG_JSON repository variable..."
+          echo "INFO: Building runtime configuration from repository variable..."
           
-          # Prüfe, ob die Variable existiert und nicht leer ist.
-          if [[ -z "${{ vars.FINOPS_CONFIG_JSON }}" ]]; then
+          # Prüfe, ob die Umgebungsvariable existiert und nicht leer ist.
+          if [[ -z "$CONFIG_JSON" ]]; then
             echo "::error::Repository variable FINOPS_CONFIG_JSON is not set or is empty."
             exit 1
           fi
           
-          # Schreibe den Inhalt der Variable direkt in die Laufzeit-Konfigurationsdatei.
-          echo "${{ vars.FINOPS_CONFIG_JSON }}" > runtime_config.json
+          # Schreibe den Inhalt der Umgebungsvariable direkt in die Laufzeit-Konfigurationsdatei.
+          # 'printf "%s"' ist sicherer als 'echo' für beliebige Strings.
+          printf "%s" "$CONFIG_JSON" > runtime_config.json
           
-          # Optional: Validiere, ob die geschriebene Datei gültiges JSON ist.
+          # Validiere, ob die geschriebene Datei gültiges JSON ist.
           if ! jq -e . runtime_config.json > /dev/null; then
             echo "::error::Content of FINOPS_CONFIG_JSON is not valid JSON."
+            # Gib den fehlerhaften Inhalt für Debugging-Zwecke aus
+            echo "--- Invalid content received: ---"
+            cat runtime_config.json
+            echo "---------------------------------"
             exit 1
           fi
 
           echo "INFO: Runtime configuration created successfully."
-          echo "--- runtime_config.json content ---"
-          cat runtime_config.json
-          echo "---------------------------------"
 
       - name: 'Read configuration from runtime_config.json'
         id: config
