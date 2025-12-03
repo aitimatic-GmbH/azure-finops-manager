@@ -26,6 +26,11 @@ jobs:
   # ====================================================================
   # JOB 2: MOCK-DATEN-TEST (Nummeriert für korrekte UI-Sortierung)
   # ====================================================================
+  test-python-modules: # underutilized VMs Mock Test 
+    name: 'Quality Gate: Python Unit Tests'
+    needs: lint-workflows
+    uses: ./.github/workflows/python-tests.yml
+
   test-report: # JOB-ID wurde umbenannt
     name: 'Quality Gate: Test Report Generation'
     # 'needs' muss jetzt auf die neue, nummerierte Job-ID verweisen.

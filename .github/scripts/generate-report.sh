@@ -78,6 +78,9 @@ create_table "Azure Advisor Empfehlungen" \
              "| Beschreibung | Ressource | Kategorie |" \
              "analysis-azure-advisor-recommendations.tsv"
 
+create_table "Unterauslastete VMs (Right-Sizing)" \
+             "| VM-Name | Ressourcengruppe | Größe | Avg. CPU (%) |" \
+             "analysis-underutilized-vms.tsv"
 
 # --- Fußzeile ---
 # Fügt den Zeitstempel am Ende des Reports hinzu
