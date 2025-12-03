@@ -75,7 +75,16 @@ def main():
         running_vms = get_running_vms(credential, subscription_id, rg)
         for vm in running_vms:
             avg_cpu = get_avg_cpu(credential, subscription_id, vm['id'], start_time, end_time)
-            print(f"     - VM: {vm['name']}, Avg CPU: {avg_cpu:.2f}%")
+            
+            # Behandelt den Fall, dass die Azure Monitor API keine Daten (None) zurückgibt.
+            if avg_cpu is None:
+                # Wenn keine Metriken gefunden wurden, behandeln wir es als 0% CPU, geben aber eine Warnung aus.
+                print(f"     - VM: {vm['name']}, Avg CPU: N/A (No metrics found)")
+                avg_cpu = 0.0
+            else:
+                print(f"     - VM: {vm['name']}, Avg CPU: {avg_cpu:.2f}%")
+            # === ENDE DER ÄNDERUNG ===
+
             if avg_cpu < cpu_threshold:
                 print("       -> MARKED as underutilized.")
                 results.append(f"{vm['name']}\t{rg}\t{vm['size']}\t{avg_cpu:.0f}")
