@@ -95,7 +95,7 @@ jobs:
         if: steps.config.outputs.unattached_disks_enabled == 'true'
         run: |
           # Leere die Zieldatei zu Beginn, um sicherzustellen, dass keine alten Ergebnisse vorhanden sind.
-          > analysis-unattached-disks.tsv
+          true > analysis-unattached-disks.tsv
 
           # Schritt 1: Ermittle die Liste der zu durchsuchenden Ressourcengruppen.
           # Wir verwenden 'comm' und Prozess-Substitution, um temporäre Dateien zu vermeiden.
