@@ -22,6 +22,7 @@ NUM_IPS=${MOCK_NUM_IPS:-2}
 NUM_SNAPSHOTS=${MOCK_NUM_SNAPSHOTS:-4}
 NUM_ADVISOR_HIGH_AVAILABILITY=${MOCK_NUM_ADVISOR_HA:-1}
 NUM_ADVISOR_COST=${MOCK_NUM_ADVISOR_COST:-2}
+NUM_UNDERUTILIZED_VMS=${MOCK_NUM_VMS:-1}
 
 # --- Start ---
 echo "🚀 Generating mock data files with the following configuration:"
@@ -30,6 +31,7 @@ echo "   - Unassociated IPs: $NUM_IPS"
 echo "   - Old Snapshots: $NUM_SNAPSHOTS"
 echo "   - Advisor (HA): $NUM_ADVISOR_HIGH_AVAILABILITY"
 echo "   - Advisor (Cost): $NUM_ADVISOR_COST"
+echo "   - Underutilized VMs: $NUM_UNDERUTILIZED_VMS"
 
 # Lösche alte Mock-Dateien, falls vorhanden
 rm -f analysis-*.tsv
@@ -86,7 +88,7 @@ fi
 # --- Modul 5: Underutilized VMs ---
 if [ "$NUM_UNDERUTILIZED_VMS" -gt 0 ]; then
     for i in $(seq 1 $NUM_UNDERUTILIZED_VMS); do
-        # Wir simulieren eine VM mit sehr niedriger CPU-Last.
+        # Format: VM-Name, Ressourcengruppe, Größe, Avg. CPU (%)
         echo -e "vm-underutilized-mock-$i\trg-mock-data\tStandard_B1s\t2" >> analysis-underutilized-vms.tsv
     done
     echo "   - Created 'analysis-underutilized-vms.tsv' with $NUM_UNDERUTILIZED_VMS entries."
