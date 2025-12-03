@@ -3,7 +3,7 @@
   "analysis_modules": {
     "old_snapshots": {
       "enabled": true,
-      "retention_days": 90
+      "retention_days": 0
     },
     "unattached_disks": {
       "enabled": true
@@ -14,6 +14,11 @@
     "azure_advisor": {
       "enabled": true,
       "categories": ["Cost", "HighAvailability"]
+    },
+    "underutilized_vms": {
+    "enabled": true,
+    "evaluation_period_days": 7,
+    "max_cpu_percentage_threshold": 5
     }
   },
   "global_settings": {

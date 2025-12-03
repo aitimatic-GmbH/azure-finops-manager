@@ -23,25 +23,65 @@ Die gesamte Lösung basiert auf den folgenden, nicht verhandelbaren Prinzipien, 
 ---
 ## 2. Gesamtarchitektur: Die 2-Workflow-Struktur
 
-Die Service-Architektur wurde überarbeitet, um die technischen Einschränkungen von GitHub Actions in Feature-Branches zu umgehen und die Testbarkeit zu verbessern. Sie besteht nun aus **zwei primären, voneinander entkoppelten Workflow-Dateien**.
+Die Service-Architektur nutzt ein **Orchestrator-Pattern**, um maximale Modularität, Testbarkeit und klare Abhängigkeiten zu gewährleisten. Ein zentraler "Main"-Workflow ruft eine Reihe von untergeordneten, wiederverwendbaren Workflows auf.
 
 **Diagramm des Prozesses:**
-`[Trigger] -> [Workflow 1 (Job A: Analyse -> Job B: Reporting)] -> (Artifact: Report)`
-`[Separater Trigger] -> [Workflow 2 (Job A: Validierung ODER Job B: Remediation)] -> (Artifact: Audit-Log)`
+```mermaid
+graph TD
+    subgraph "CI/CD Pipeline (Pull Request / Push)"
+        A[Start: PR/Push] --> B{0 - Main Workflow};
+        
+        subgraph "Quality Gates"
+            B --> C[2 - Linting];
+            B --> D[3.1 - Python Tests];
+            B --> E[3 - Mock Report Test];
+        end
 
-### 2.1 Workflow 1: Analyse & Reporting (`1-analyze-and-report.yml`)
+        subgraph "Analyse"
+            C --> F{1 - Analyse & Report};
+            D --> F;
+            E --> F;
+        end
+
+        F --> G((Artifact: Report.md));
+    end
+
+    subgraph "Manuelle Bereinigung"
+        H[Start: Manuell] --> I{4 - Remediate Workflow};
+        I --> J((Artifact: Audit-Log));
+    end
+```
+
+### 2.1 Der Orchestrator und die Quality Gates: `0-main-workflow.yml`
+
+*   **Zweck:** Dient als zentraler Einstiegspunkt für die automatisierte CI/CD-Pipeline. Er selbst enthält keine ausführende Logik, sondern delegiert diese an die wiederverwendbaren Workflows.
+*   **Trigger:** `push` (auf Feature-Branches), `pull_request` (auf `main`) und `workflow_dispatch` (manuell).
+*   **Logik:**
+    1.  Startet die drei "Quality Gate"-Workflows (Linting, Python-Tests, Mock-Report-Test).
+    2.  Wartet auf deren erfolgreichen Abschluss (`needs: [...]`).
+    3.  Startet erst dann den Haupt-Analyse-Workflow (`1-analyze-and-report.yml`).
+
+* **Qualiti-Gate-Workflows**
+    *   **`2-lint-workflows.yml` (Linting):**
+        *   **Zweck:** Stellt als Quality Gate sicher, dass alle Workflow-Dateien eine gültige Syntax haben (`actionlint`).
+
+    *   **`3-mock-test-report-generation.yml` (Mock-Report-Test):**
+        *   **Zweck:** Stellt als Quality Gate sicher, dass die Report-Generierung (`generate-report.sh`) korrekt funktioniert, indem es gefälschte Analysedaten (`create-mock-data.sh`) verwendet.
+
+    *   **`3.1-python-tests.yml` (Python Unit-Tests):**
+        *   **Zweck:** Stellt als Quality Gate sicher, dass alle in Python geschriebenen Analyse-Module (z.B. für unterauslastete VMs) ihre logischen Tests bestehen.
+
+### 2.2 Haupt-Workflows: Analyse & Reporting (`1-analyze-and-report.yml`)
 
 *   **Zweck:** Dieser Workflow kombiniert die Analyse und das Reporting in einer einzigen, orchestrierten Ausführung. Er ist der primäre Workflow für die Datensammlung und Aufbereitung.
 *   **Struktur:** Er besteht aus zwei Jobs, die nacheinander ausgeführt werden:
     1.  **Job `analyze`:** Führt ausschließlich lesende Operationen auf Azure durch, um Einsparpotenziale zu identifizieren. Er nutzt einen Service Principal mit **"Leser" (Reader)**-Rechten. Sein Ergebnis (mehrere `.tsv`-Dateien) wird als Artefakt (`finops-analysis-results`) hochgeladen.
     2.  **Job `report`:** Wartet auf den erfolgreichen Abschluss des `analyze`-Jobs (`needs: analyze`). Er lädt das Artefakt herunter, verarbeitet die Rohdaten mit dem `generate-report.sh`-Skript und lädt den fertigen Markdown-Bericht als Artefakt (`finops-cost-report`) hoch.
-*   **Trigger:**
-    *   **Manuell (`workflow_dispatch`):** Für Ad-hoc-Analysen über die CLI.
-    *   **Automatisch (`push`):** Für kontinuierliche Tests während der Entwicklung in Feature-Branches.
+*   **Trigger:** Wird vom Orchestrator aufgerufen (`on: workflow_call`) oder kann für isolierte Tests manuell gestartet werden (`on: workflow_dispatch`).
 
-### 2.2 Workflow 2: Remediation (`2-remediate-resources.yml`)
+### 2.3 Manueller Workflow: Remediation (`4-remediate-resources.yml`)
 
-*   **Zweck:** Führt aktive, ändernde Operationen (z.B. das Löschen von Ressourcen) durch und ist durch mehrere Sicherheitsstufen strikt abgesichert.
+*   **Zweck:** Führt aktive, ändernde Operationen (z.B. das Löschen von Ressourcen) durch und ist durch mehrere Sicherheitsstufen strikt abgesichert. Dieser Workflow ist bewusst vom CI/CD-Prozess entkoppelt.
 *   **Struktur:** Er besteht aus zwei Jobs, die sich gegenseitig ausschließen und auf unterschiedliche Trigger reagieren:
     1.  **Job `on-push-validation`:** Läuft **nur** bei einem `push`-Event. Er führt einen sicheren "Verbindungstest" durch, indem er sich mit den hochprivilegierten `WRITE`-Credentials anmeldet, um deren Korrektheit zu validieren, ohne Änderungen vorzunehmen.
     2.  **Job `manual-remediation`:** Läuft **nur** bei einem manuellen `workflow_dispatch`-Event. Er führt die eigentliche Bereinigung durch, geschützt durch manuelle Inputs (Auswahl des Ressourcentyps, Bestätigungsphrase).

@@ -1,4 +1,4 @@
-# .github/workflows/lint-workflows.yml
+# .github/workflows/2-lint-workflows.yml
 
 name: 'Reuseable: Lint Workflow Files'
 

@@ -25,8 +25,8 @@ jobs:
           MOCK_NUM_ADVISOR_HA: ${{ vars.MOCK_NUM_ADVISOR_HA }}
           MOCK_NUM_ADVISOR_COST: ${{ vars.MOCK_NUM_ADVISOR_COST }}
         run: |
-          chmod +x .github/scripts/create-mock-data.sh
-          .github/scripts/create-mock-data.sh
+          chmod +x ./tests/create-mock-data.sh
+          ./tests/create-mock-data.sh
 
       - name: 'Generate report from mock data'
         run: |
