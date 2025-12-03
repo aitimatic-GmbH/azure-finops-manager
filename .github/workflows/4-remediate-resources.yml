@@ -1,6 +1,6 @@
 # .github/workflows/2-remediate-resources.yml
 
-name: '2 - Remediate Azure Resources'
+name: '4 - Remediate Azure Resources'
 
 on:
   workflow_dispatch:
