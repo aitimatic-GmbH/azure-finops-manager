@@ -92,32 +92,37 @@ function process_remediation() {
 # --- Aufruf der Verarbeitungs-Funktion basierend auf dem Input ---
 # Die 'case'-Anweisung steuert, welche Ressourcentypen verarbeitet werden.
 # Bei 'DRY-RUN' wird dank ';&' durch alle Blöcke gefallen ("fall-through").
-# Bei einem spezifischen Typ wird nur dieser Block ausgeführt und mit 'break' beendet.
 case $RESOURCE_TYPE in
-    "unattached-disks" | "DRY-RUN")
+    "DRY-RUN")
+        # Im DRY-RUN-Modus führen wir alle process_remediation-Aufrufe nacheinander aus.
+        log_info "Executing DRY-RUN for all resource types..."
         process_remediation "analysis-unattached-disks.tsv" "Disk" 'az disk delete --name "$name" --resource-group "$group" --yes'
-        # KORREKTUR: Verwende ';;' statt 'break', um den case-Block zu beenden.
-        if [[ "$RESOURCE_TYPE" != "DRY-RUN" ]]; then ;; fi
-        ;&
-    "unassociated-public-ips" | "DRY-RUN")
         process_remediation "analysis-unassociated-public-ips.tsv" "Public IP" 'az network public-ip delete --name "$name" --resource-group "$group"'
-        # KORREKTUR: Verwende ';;' statt 'break'.
-        if [[ "$RESOURCE_TYPE" != "DRY-RUN" ]]; then ;; fi
-        ;&
-    "old-snapshots" | "DRY-RUN")
         process_remediation "analysis-old-snapshots.tsv" "Snapshot" 'az snapshot delete --name "$name" --resource-group "$group"'
-        # KORREKTUR: Verwende ';;' statt 'break'.
-        if [[ "$RESOURCE_TYPE" != "DRY-RUN" ]]; then ;; fi
-        ;&
-    "underutilized-vms" | "DRY-RUN")
         process_remediation "analysis-underutilized-vms.tsv" "Underutilized VM" 'az vm deallocate --name "$name" --resource-group "$group" --no-wait'
-        # KORREKTUR: Verwende ';;' statt 'break'.
-        if [[ "$RESOURCE_TYPE" != "DRY-RUN" ]]; then ;; fi
-        ;; # Dieses ';;' war schon korrekt und beendet den gesamten Fall.
+        ;; # Beendet den DRY-RUN Fall
+
+    "unattached-disks")
+        process_remediation "analysis-unattached-disks.tsv" "Disk" 'az disk delete --name "$name" --resource-group "$group" --yes'
+        ;; # Beendet den Fall
+
+    "unassociated-public-ips")
+        process_remediation "analysis-unassociated-public-ips.tsv" "Public IP" 'az network public-ip delete --name "$name" --resource-group "$group"'
+        ;; # Beendet den Fall
+
+    "old-snapshots")
+        process_remediation "analysis-old-snapshots.tsv" "Snapshot" 'az snapshot delete --name "$name" --resource-group "$group"'
+        ;; # Beendet den Fall
+
+    "underutilized-vms")
+        process_remediation "analysis-underutilized-vms.tsv" "Underutilized VM" 'az vm deallocate --name "$name" --resource-group "$group" --no-wait'
+        ;; # Beendet den Fall
+
     "SIMULATION-ONLY")
         log_info "SIMULATION MODE: No actions taken."
         echo "SIMULATION MODE: No actions taken." >> $LOG_FILE
         ;;
+
     *)
         log_error "Ungültiger Ressourcentyp '$RESOURCE_TYPE'. Remediation abgebrochen."
         exit 1
