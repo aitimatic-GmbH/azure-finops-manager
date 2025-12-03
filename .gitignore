@@ -10,3 +10,7 @@ Thumbs.db
 .env
 local.*
 bin/*
+
+#Python 
+.venv/
+__pycache__

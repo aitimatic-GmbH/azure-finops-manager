@@ -47,7 +47,6 @@ else
     echo "   - Created empty 'analysis-unattached-disks.tsv'."
 fi
 
-# (Restliche Module folgen hier unverändert...)
 # --- Modul 2: Unassociated Public IPs ---
 if [ "$NUM_IPS" -gt 0 ]; then
     for i in $(seq 1 $NUM_IPS); do
@@ -82,6 +81,18 @@ if [ "$((NUM_ADVISOR_HIGH_AVAILABILITY + NUM_ADVISOR_COST))" -gt 0 ]; then
 else
     touch analysis-azure-advisor-recommendations.tsv
     echo "   - Created empty 'analysis-azure-advisor-recommendations.tsv'."
+fi
+
+# --- Modul 5: Underutilized VMs ---
+if [ "$NUM_UNDERUTILIZED_VMS" -gt 0 ]; then
+    for i in $(seq 1 $NUM_UNDERUTILIZED_VMS); do
+        # Wir simulieren eine VM mit sehr niedriger CPU-Last.
+        echo -e "vm-underutilized-mock-$i\trg-mock-data\tStandard_B1s\t2" >> analysis-underutilized-vms.tsv
+    done
+    echo "   - Created 'analysis-underutilized-vms.tsv' with $NUM_UNDERUTILIZED_VMS entries."
+else
+    touch analysis-underutilized-vms.tsv
+    echo "   - Created empty 'analysis-underutilized-vms.tsv'."
 fi
 
 echo "✅ Mock data generation complete."
