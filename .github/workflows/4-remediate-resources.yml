@@ -83,6 +83,7 @@ jobs:
         with:
           name: finops-analysis-results
           run-id: ${{ github.event.inputs.analysis_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 'Azure Login (Privileged)'
         uses: azure/login@v2
