@@ -96,23 +96,24 @@ function process_remediation() {
 case $RESOURCE_TYPE in
     "unattached-disks" | "DRY-RUN")
         process_remediation "analysis-unattached-disks.tsv" "Disk" 'az disk delete --name "$name" --resource-group "$group" --yes'
-        if [[ "$RESOURCE_TYPE" != "DRY-RUN" ]]; then break; fi
+        # KORREKTUR: Verwende ';;' statt 'break', um den case-Block zu beenden.
+        if [[ "$RESOURCE_TYPE" != "DRY-RUN" ]]; then ;; fi
         ;&
     "unassociated-public-ips" | "DRY-RUN")
         process_remediation "analysis-unassociated-public-ips.tsv" "Public IP" 'az network public-ip delete --name "$name" --resource-group "$group"'
-        if [[ "$RESOURCE_TYPE" != "DRY-RUN" ]]; then break; fi
+        # KORREKTUR: Verwende ';;' statt 'break'.
+        if [[ "$RESOURCE_TYPE" != "DRY-RUN" ]]; then ;; fi
         ;&
     "old-snapshots" | "DRY-RUN")
         process_remediation "analysis-old-snapshots.tsv" "Snapshot" 'az snapshot delete --name "$name" --resource-group "$group"'
-        if [[ "$RESOURCE_TYPE" != "DRY-RUN" ]]; then break; fi
+        # KORREKTUR: Verwende ';;' statt 'break'.
+        if [[ "$RESOURCE_TYPE" != "DRY-RUN" ]]; then ;; fi
         ;&
-    # --- NEUER BLOCK FÜR UNTERAUSGELASTETE VMs ---
-    # Dieser Block wird ausgeführt, wenn --type 'underutilized-vms' oder 'DRY-RUN' ist.
     "underutilized-vms" | "DRY-RUN")
-        # Ruft die zentrale Funktion mit dem passenden Kommando für die VM-Deallokierung auf.
         process_remediation "analysis-underutilized-vms.tsv" "Underutilized VM" 'az vm deallocate --name "$name" --resource-group "$group" --no-wait'
-        if [[ "$RESOURCE_TYPE" != "DRY-RUN" ]]; then break; fi
-        ;; # Wichtig: ';;' beendet den Fall für 'DRY-RUN' hier.
+        # KORREKTUR: Verwende ';;' statt 'break'.
+        if [[ "$RESOURCE_TYPE" != "DRY-RUN" ]]; then ;; fi
+        ;; # Dieses ';;' war schon korrekt und beendet den gesamten Fall.
     "SIMULATION-ONLY")
         log_info "SIMULATION MODE: No actions taken."
         echo "SIMULATION MODE: No actions taken." >> $LOG_FILE
@@ -122,7 +123,6 @@ case $RESOURCE_TYPE in
         exit 1
         ;;
 esac
-
 
 # --- Skript-Abschluss ---
 echo "-------------------------------------------" >> $LOG_FILE
