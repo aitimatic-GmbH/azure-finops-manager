@@ -161,6 +161,9 @@ jobs:
       - name: 'Module: Find underutilized VMs'
         # Die if-Bedingung greift auf den Output des 'config'-Schritts zu.
         if: steps.config.outputs.underutilized_vms_enabled == 'true'
+        # Wir setzen die Azure Subscription ID als Umgebungsvariable für das Python-Skript.
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         # Wir verwenden eine separate Shell, um die Python-Umgebung zu verwalten.
         shell: bash
         run: |

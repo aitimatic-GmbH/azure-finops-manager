@@ -44,6 +44,6 @@ jobs:
   analyze-and-report: # JOB-ID wurde umbenannt
     name: 'Main Task: Analyze and Report'
     # 'needs' muss jetzt auf die neuen, nummerierten Job-IDs verweisen.
-    needs: [lint-workflows, test-report]
+    needs: [lint-workflows, test-report, test-python-modules]
     uses: ./.github/workflows/1-analyze-and-report.yml
     secrets: inherit
