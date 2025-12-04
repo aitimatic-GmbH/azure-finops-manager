@@ -92,10 +92,9 @@ graph TD
 
 ## 3. Implementierungs-Details: Analyse-Module
 
-Dieses Kapitel beschreibt die konkreten technischen Logiken, die im Analyse-Workflow zur Identifizierung von Einsparpotenzialen verwendet werden.
+Dieses Kapitel beschreibt die **aktuell im Code implementierten** technischen Logiken, die im Analyse-Workflow zur Identifizierung von Einsparpotenzialen verwendet werden.
 
 ### 3.1 Modul: Verwaiste Ressourcen
-
 *   **Ziel:** Identifiziere Ressourcen, die Kosten verursachen, aber keiner aktiven Hauptressource mehr zugeordnet sind.
 *   **3.1.1 Verwaiste Festplatten (Unattached Disks)**
     *   **Logik:** `az disk list --query "[?diskState=='Unattached']"`
@@ -103,35 +102,20 @@ Dieses Kapitel beschreibt die konkreten technischen Logiken, die im Analyse-Work
 *   **3.1.2 Ungenutzte öffentliche IP-Adressen (Unassociated Public IPs)**
     *   **Logik:** `az network public-ip list --query "[?ipConfiguration==null]"`
     *   **Output-Datei:** `analysis-unassociated-public-ips.tsv`
-*   **3.1.3 Verwaiste Netzwerkschnittstellen (Detached NICs)**
-    *   **Logik:** `az network nic list --query "[?virtualMachine==null]"`
-    *   **Output-Datei:** `analysis-detached-nics.tsv`
 
-### 3.2 Modul: Überdimensionierte Ressourcen (Right-Sizing)
-
-*   **Ziel:** Identifiziere Ressourcen, deren gebuchte Leistung signifikant höher ist als die tatsächliche Nutzung.
-*   **3.2.1 Überdimensionierte VMs (CPU)**
-    *   **Logik:** Abfrage von Azure Monitor Metriken (`az monitor metrics list`) für `Percentage CPU` über die letzten 30 Tage. Filtere VMs, deren durchschnittliche oder maximale Auslastung unter einem Schwellenwert (z.B. `avg < 15%`) liegt.
-    *   **Output-Datei:** `analysis-downsize-vm-candidates.tsv`
-*   **3.2.2 Unterausgelastete App Service Pläne**
-    *   **Logik:** Abfrage von Azure Monitor Metriken für `CpuPercentage` und `MemoryPercentage` des App Service Plans. Filtere Pläne, die konstant unterausgelastet sind.
-    *   **Output-Datei:** `analysis-downsize-asp-candidates.tsv`
-
-### 3.3 Modul: Ungenutzte oder veraltete Ressourcen
-
-*   **Ziel:** Identifiziere Ressourcen, die seit langer Zeit nicht mehr genutzt werden oder durch veraltete Konfigurationen ein Risiko darstellen.
-*   **3.3.1 Alte Snapshots von VMs**
+### 3.2 Modul: Ungenutzte oder veraltete Ressourcen
+*   **Ziel:** Identifiziere Ressourcen, die seit langer Zeit nicht mehr genutzt werden.
+*   **3.2.1 Alte Snapshots von VMs**
     *   **Logik:** `az snapshot list --query "[?timeCreated < '$(date -d '-90 days' -u +'%Y-%m-%dT%H:%M:%SZ')']"`
     *   **Output-Datei:** `analysis-old-snapshots.tsv`
-*   **3.3.2 Leere Ressourcengruppen**
-    *   **Logik:** Iteriere durch alle Ressourcengruppen (`az group list`) und prüfe für jede Gruppe die Anzahl der enthaltenen Ressourcen (`az resource list --resource-group [RG_NAME]`). Filtere Gruppen mit 0 Ressourcen.
-    *   **Output-Datei:** `analysis-empty-resource-groups.tsv`
-*   **3.3.3 Veraltete App Service TLS/SSL-Einstellungen**
-    *   **Logik:** `az webapp list --query "[?httpsSettings.minTlsVersion!='1.2']"`
-    *   **Output-Datei:** `analysis-outdated-tls-settings.tsv`
+
+### 3.3 Modul: Überdimensionierte Ressourcen (Right-Sizing)
+*   **Ziel:** Identifiziere Ressourcen, deren gebuchte Leistung signifikant höher ist als die tatsächliche Nutzung.
+*   **3.3.1 Unterauslastete VMs (CPU)**
+    *   **Logik:** Abfrage von Azure Monitor Metriken (`az monitor metrics list`) für `Percentage CPU` über die letzten 30 Tage. Filtere VMs, deren durchschnittliche oder maximale Auslastung unter einem Schwellenwert (z.B. `avg < 15%`) liegt.
+    *   **Output-Datei:** `analysis-downsize-vm-candidates.tsv`
 
 ### 3.4 Modul: Azure Advisor Empfehlungen
-
 *   **Ziel:** Systematische Sammlung und Kategorisierung der von Azure selbst generierten Empfehlungen.
 *   **Logik:** `az advisor recommendation list --query "[?category=='Cost' || category=='HighAvailability']"`
 *   **Output-Datei:** `analysis-azure-advisor-recommendations.tsv`
