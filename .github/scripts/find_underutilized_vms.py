@@ -1,11 +1,12 @@
 import os
 import json
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.resource import ResourceManagementClient
 from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.monitor import MonitorManagementClient
+from itertools import chain
 
 # --- Hilfsfunktionen (können später für Tests gemockt werden) ---
 
@@ -37,13 +38,16 @@ def get_avg_cpu(credential, subscription_id, vm_id, start_time, end_time):
         interval="P1D"
     )
     try:
-        return metrics_data.value[0].timeseries[0].data[0].average
+        avg = metrics_data.value[0].timeseries[0].data[0].average
+        if avg is None:
+            return 0.0
+        return avg
     except (IndexError, TypeError, AttributeError):
         return 0.0
 
 def analyze_vm(credential, subscription_id, vm, rg, start_time, end_time, cpu_treshold):
     avg_cpu = get_avg_cpu(credential, subscription_id, vm['id'], start_time, end_time)
-    if avg_cpu is None:
+    if avg_cpu == 0.0:
         print (f"     - VM: {vm['name']}, Avg CPU: N/A (No metrics found)")
     else:
         print (f"     - VM: {vm['name']}, Avg CPU: {avg_cpu:.2f}%")
@@ -62,8 +66,6 @@ def analyze_resource_group(credential, subscription_id, rg, start_time, end_time
         )
     )
     
-from itertools import chain
-
 # --- Hauptlogik ---
 
 def main():
@@ -77,7 +79,7 @@ def main():
     evaluation_days = vm_config.get('evaluation_period_days', 7)
     cpu_threshold = vm_config.get('max_cpu_percentage_threshold', 5)
 
-    end_time = datetime.utcnow()
+    end_time = datetime.now(timedelta.utc)
     start_time = end_time - timedelta(days=evaluation_days)
 
     print(f"INFO: Searching for VMs with CPU below {cpu_threshold}% over {evaluation_days} days.")
