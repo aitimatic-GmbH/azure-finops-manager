@@ -79,7 +79,7 @@ def main():
     evaluation_days = vm_config.get('evaluation_period_days', 7)
     cpu_threshold = vm_config.get('max_cpu_percentage_threshold', 5)
 
-    end_time = datetime.now(timedelta.utc)
+    end_time = datetime.now(timezone.utc)
     start_time = end_time - timedelta(days=evaluation_days)
 
     print(f"INFO: Searching for VMs with CPU below {cpu_threshold}% over {evaluation_days} days.")
