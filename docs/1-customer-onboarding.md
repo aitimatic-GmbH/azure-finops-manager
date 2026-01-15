@@ -94,8 +94,8 @@ az ad app federated-credential create --id $OBJECT_ID --parameters '{"name":"git
 ## Weg 2: Lokale Azure CLI
 Diese Schritte sind identisch zu Weg 1, aber Sie führen sie in Ihrem lokalen Terminal aus, nachdem Sie sich mit az login angemeldet haben.
 
-1\. Anmelden: az login
-2\. Subscription festlegen (falls nötig): az account set --subscription "IHRE_SUBSCRIPTION_ID"
+1\. Anmelden: az login  
+2\. Subscription festlegen (falls nötig): az account set --subscription "IHRE_SUBSCRIPTION_ID"  
 3\. Befehle ausführen: Führen Sie die Schritte 2, 3 und 4 von "Weg 1" aus.
 
 ## Weg 3: Azure Portal (Grafische Oberfläche)
