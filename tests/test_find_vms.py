@@ -2,11 +2,11 @@ import unittest
 from unittest.mock import patch, MagicMock
 import os
 import json
-
-# Importiere das Skript, das wir testen wollen
-# Wir müssen den Pfad anpassen, damit Python es findet
 import sys
+
+# Pfad anpassen, damit Python das Skript findet
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.github/scripts')))
+
 import find_underutilized_vms
 
 class TestFindVMs(unittest.TestCase):
