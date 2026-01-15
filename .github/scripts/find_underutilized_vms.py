@@ -28,13 +28,13 @@ def get_running_vms(credential, subscription_id, resource_group):
             vms.append({'id': vm.id, 'name': vm.name, 'size': vm.hardware_profile.vm_size})
     return vms
 
-def get_avg_cpu(credential, subscription_id, vm_id, start_time, end_time):
+def get_avg_cpu(credential, subscription_id, vm_id, start_iso, end_iso):
     monitor_client = MonitorManagementClient(credential, subscription_id)
     metrics_data = monitor_client.metrics.list(
         vm_id,
         metricnames="Percentage CPU",
         aggregation="Average",
-        timespan=f"{start_time}/{end_time}",
+        timespan=f"{start_iso}/{end_iso}",
         interval="P1D"
     )
     try:
@@ -45,8 +45,8 @@ def get_avg_cpu(credential, subscription_id, vm_id, start_time, end_time):
     except (IndexError, TypeError, AttributeError):
         return 0.0
 
-def analyze_vm(credential, subscription_id, vm, rg, start_time, end_time, cpu_treshold):
-    avg_cpu = get_avg_cpu(credential, subscription_id, vm['id'], start_time, end_time)
+def analyze_vm(credential, subscription_id, vm, rg, start_iso, end_iso, cpu_treshold):
+    avg_cpu = get_avg_cpu(credential, subscription_id, vm['id'], start_iso, end_iso)
     if avg_cpu == 0.0:
         print (f"     - VM: {vm['name']}, Avg CPU: N/A (No metrics found)")
     else:
@@ -56,13 +56,13 @@ def analyze_vm(credential, subscription_id, vm, rg, start_time, end_time, cpu_tr
         return f"{vm['name']}\t{rg}\t{vm['size']}\t{avg_cpu:.0f}"
     return None
 
-def analyze_resource_group(credential, subscription_id, rg, start_time, end_time, cpu_treshold):
+def analyze_resource_group(credential, subscription_id, rg, start_iso, end_iso, cpu_treshold):
     print(f"   - Scanning resource group: {rg}")
     running_vms = get_running_vms(credential, subscription_id, rg)
     return filter(
         None,
         (
-            analyze_vm(credential, subscription_id, vm, rg, start_time, end_time, cpu_treshold) for vm in running_vms
+            analyze_vm(credential, subscription_id, vm, rg, start_iso, end_iso, cpu_treshold) for vm in running_vms
         )
     )
     
@@ -82,6 +82,10 @@ def main():
     end_time = datetime.now(timezone.utc)
     start_time = end_time - timedelta(days=evaluation_days)
 
+    # ISO 8601 Format für Azure API
+    start_iso = start_time.replace(microsecond=0).isoformat().replace('+00:00', 'Z')
+    end_iso = end_time.replace(microsecond=0).isoformat().replace('+00:00', 'Z')
+
     print(f"INFO: Searching for VMs with CPU below {cpu_threshold}% over {evaluation_days} days.")
 
     # 2. Azure-Verbindung herstellen
@@ -100,8 +104,8 @@ def main():
                 credential,
                 subscription_id,
                 rg,
-                start_time,
-                end_time,
+                start_iso,
+                end_iso,
                 cpu_threshold
             )
             for rg in rgs_to_scan
