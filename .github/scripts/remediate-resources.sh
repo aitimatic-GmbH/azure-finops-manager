@@ -89,10 +89,8 @@ function process_remediation() {
     done < "$file_path"
 }
 
-# --- Aufruf der Verarbeitungs-Funktion basierend auf dem Input ---
-# Die 'case'-Anweisung steuert, welche Ressourcentypen verarbeitet werden.
-# Bei 'DRY-RUN' wird dank ';&' durch alle Blöcke gefallen ("fall-through").
-# --- Aufruf der Verarbeitungs-Funktion basierend auf dem Input ---
+# --- Auswahl der Remediation basierend auf dem Ressourcentyp ---
+# Steuert, welche Ressourcentypen verarbeitet werden.
 case $RESOURCE_TYPE in
     "DRY-RUN")
         # Im DRY-RUN-Modus werden alle Aktionen für alle Typen simuliert.
@@ -101,7 +99,7 @@ case $RESOURCE_TYPE in
         process_remediation "analysis-unassociated-public-ips.tsv" "Public IP" 'az network public-ip delete --name "$name" --resource-group "$group"'
         process_remediation "analysis-old-snapshots.tsv" "Snapshot" 'az snapshot delete --name "$name" --resource-group "$group"'
         process_remediation "analysis-underutilized-vms.tsv" "Underutilized VM" 'az vm deallocate --name "$name" --resource-group "$group" --no-wait'
-        ;; # Beendet den DRY-RUN Fall
+        ;;
 
     "all")
         # Im "all"-Modus werden alle Aktionen für alle Typen tatsächlich ausgeführt.
@@ -110,23 +108,23 @@ case $RESOURCE_TYPE in
         process_remediation "analysis-unassociated-public-ips.tsv" "Public IP" 'az network public-ip delete --name "$name" --resource-group "$group"'
         process_remediation "analysis-old-snapshots.tsv" "Snapshot" 'az snapshot delete --name "$name" --resource-group "$group"'
         process_remediation "analysis-underutilized-vms.tsv" "Underutilized VM" 'az vm deallocate --name "$name" --resource-group "$group" --no-wait'
-        ;; # Beendet den "all" Fall
+        ;;
 
     "unattached-disks")
         process_remediation "analysis-unattached-disks.tsv" "Disk" 'az disk delete --name "$name" --resource-group "$group" --yes'
-        ;; # Beendet den Fall
+        ;;
 
     "unassociated-public-ips")
         process_remediation "analysis-unassociated-public-ips.tsv" "Public IP" 'az network public-ip delete --name "$name" --resource-group "$group"'
-        ;; # Beendet den Fall
+        ;;
 
     "old-snapshots")
         process_remediation "analysis-old-snapshots.tsv" "Snapshot" 'az snapshot delete --name "$name" --resource-group "$group"'
-        ;; # Beendet den Fall
+        ;;
 
     "underutilized-vms")
         process_remediation "analysis-underutilized-vms.tsv" "Underutilized VM" 'az vm deallocate --name "$name" --resource-group "$group" --no-wait'
-        ;; # Beendet den Fall
+        ;;
 
     "SIMULATION-ONLY")
         log_info "SIMULATION MODE: No actions taken."
