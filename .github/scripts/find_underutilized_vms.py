@@ -41,6 +41,29 @@ def get_avg_cpu(credential, subscription_id, vm_id, start_time, end_time):
     except (IndexError, TypeError, AttributeError):
         return 0.0
 
+def analyze_vm(credential, subscription_id, vm, rg, start_time, end_time, cpu_treshold):
+    avg_cpu = get_avg_cpu(credential, subscription_id, vm['id'], start_time, end_time)
+    if avg_cpu is None:
+        print (f"     - VM: {vm['name']}, Avg CPU: N/A (No metrics found)")
+    else:
+        print (f"     - VM: {vm['name']}, Avg CPU: {avg_cpu:.2f}%")
+    if avg_cpu < cpu_treshold:
+        print("       -> MARKED as underutilized.")
+        return f"{vm['name']}\t{rg}\t{vm['size']}\t{avg_cpu:.0f}"
+    return None
+
+def analyze_resource_group(credential, subscription_id, rg, start_time, end_time, cpu_treshold):
+    print(f"   - Scanning resource group: {rg}")
+    running_vms = get_running_vms(credential, subscription_id, rg)
+    return filter(
+        None,
+        (
+            analyze_vm(credential, subscription_id, vm, rg, start_time, end_time, cpu_treshold) for vm in running_vms
+        )
+    )
+    
+from itertools import chain
+
 # --- Hauptlogik ---
 
 def main():
@@ -69,25 +92,19 @@ def main():
     print(f"INFO: Found {len(rgs_to_scan)} resource groups to scan.")
 
     # 4. VMs analysieren und Ergebnisse schreiben
-    results = []
-    for rg in rgs_to_scan:
-        print(f"   - Scanning resource group: {rg}")
-        running_vms = get_running_vms(credential, subscription_id, rg)
-        for vm in running_vms:
-            avg_cpu = get_avg_cpu(credential, subscription_id, vm['id'], start_time, end_time)
-            
-            # Behandelt den Fall, dass die Azure Monitor API keine Daten (None) zurückgibt.
-            if avg_cpu is None:
-                # Wenn keine Metriken gefunden wurden, behandeln wir es als 0% CPU, geben aber eine Warnung aus.
-                print(f"     - VM: {vm['name']}, Avg CPU: N/A (No metrics found)")
-                avg_cpu = 0.0
-            else:
-                print(f"     - VM: {vm['name']}, Avg CPU: {avg_cpu:.2f}%")
-            # === ENDE DER ÄNDERUNG ===
-
-            if avg_cpu < cpu_threshold:
-                print("       -> MARKED as underutilized.")
-                results.append(f"{vm['name']}\t{rg}\t{vm['size']}\t{avg_cpu:.0f}")
+    results = list(
+        chain.from_iterable(
+            analyze_resource_group(
+                credential,
+                subscription_id,
+                rg,
+                start_time,
+                end_time,
+                cpu_threshold
+            )
+            for rg in rgs_to_scan
+        )
+    )
 
     # 5. Ergebnisdatei schreiben
     with open('analysis-underutilized-vms.tsv', 'w') as f:
