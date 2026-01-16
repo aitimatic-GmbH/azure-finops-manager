@@ -1,0 +1,49 @@
+name: '4 - Mock Test Report Generation'
+
+# ====================================================================
+# TRIGGER:
+# 1. Kann von einem anderen Workflow aufgerufen werden (für die CI-Pipeline).
+# 2. Kann manuell gestartet werden.
+# ====================================================================
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  # Der Job-Name ist wichtig, wir brauchen ihn gleich im anderen Workflow.
+  test-report-generation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Checkout code'
+        uses: actions/checkout@v6
+
+      - name: 'Generate mock data from Repository Variables'
+        env:
+          MOCK_NUM_DISKS: ${{ vars.MOCK_NUM_DISKS }}
+          MOCK_NUM_IPS: ${{ vars.MOCK_NUM_IPS }}
+          MOCK_NUM_SNAPSHOTS: ${{ vars.MOCK_NUM_SNAPSHOTS }}
+          MOCK_NUM_ADVISOR_HA: ${{ vars.MOCK_NUM_ADVISOR_HA }}
+          MOCK_NUM_ADVISOR_COST: ${{ vars.MOCK_NUM_ADVISOR_COST }}
+        run: |
+          chmod +x ./tests/create-mock-data.sh
+          ./tests/create-mock-data.sh
+
+      - name: 'Generate report from mock data'
+        run: |
+          chmod +x .github/scripts/generate-report.sh
+          .github/scripts/generate-report.sh
+
+      - name: 'Validate report content'
+        run: |
+          echo "Checking if report.md was created and is not empty..."
+          if [ ! -s report.md ]; then
+            echo "::error::Report file 'report.md' is empty or was not created!"
+            exit 1
+          fi
+          echo "Report validation successful."
+
+      - name: 'Upload test report'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-from-variables
+          path: report.md

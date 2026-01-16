@@ -1,0 +1,112 @@
+# .github/workflows/4-remediate-resources.yml
+
+name: '4 - Remediate Azure Resources'
+
+on:
+  workflow_dispatch:
+    inputs:
+      analysis_run_id:
+        description: 'ID of the analysis run to use for remediation'
+        required: true
+      resource_type_to_remediate:
+        description: 'Type of resource to remediate (or DRY-RUN)'
+        required: true
+        type: choice
+        options:
+          - DRY-RUN
+          - unattached-disks
+          - unassociated-public-ips
+          - old-snapshots
+          - underutilized-vms
+          - all
+      confirmation_phrase:
+        description: 'Type "DELETE" to confirm the remediation action. (Not required for DRY-RUN)'
+        required: false
+  push:
+    branches:
+      - feature/**
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+  actions: read
+
+jobs:
+  # ====================================================================
+  # JOB 1: ON-PUSH VALIDATION
+  # Dieser Job läuft nur bei einem 'push' und testet die Schreib-Credentials.
+  # ====================================================================
+  on-push-validation:
+    runs-on: ubuntu-latest
+    # Läuft NUR bei einem 'push'-Event.
+    if: github.event_name == 'push'
+    steps:
+      - name: 'Azure Login Test (Privileged)'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_WRITE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_WRITE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: 'Verify Login'
+        run: |
+          echo "Login with WRITE credentials successful."
+          az account show
+
+      - name: 'Azure Logout'
+        run: |
+          az logout
+          az cache purge
+          az account clear
+
+  # ====================================================================
+  # JOB 2: MANUAL REMEDIATION
+  # Dieser Job läuft nur bei einem manuellen 'workflow_dispatch'.
+  # ====================================================================
+  manual-remediation:
+    runs-on: ubuntu-latest
+    # Läuft NUR bei einem 'workflow_dispatch'-Event.
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: 'Security Gate: Verify confirmation phrase'
+        # Die Bestätigung ist nicht nötig, wenn nur ein DRY-RUN ausgeführt wird.
+        if: github.event.inputs.resource_type_to_remediate != 'DRY-RUN' && github.event.inputs.confirmation_phrase != 'DELETE'
+        run: |
+          echo "::error::Confirmation phrase 'DELETE' is required for actual remediation."
+          exit 1
+
+      - name: 'Checkout code'
+        uses: actions/checkout@v6
+
+      - name: 'Download analysis results from the specified run'
+        uses: actions/download-artifact@v4
+        with:
+          name: finops-analysis-results
+          run-id: ${{ github.event.inputs.analysis_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 'Azure Login (Privileged)'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_WRITE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_WRITE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: 'Execute Remediation Script'
+        run: |
+          chmod +x .github/scripts/remediate-resources.sh
+          ./.github/scripts/remediate-resources.sh --type "${{ github.event.inputs.resource_type_to_remediate }}"
+
+      - name: 'Upload Remediation Log'
+        uses: actions/upload-artifact@v4
+        with:
+          name: finops-remediation-log
+          path: remediation-log.txt
+          if-no-files-found: error
+
+      - name: 'Azure Logout'
+        run: |
+          az logout
+          az cache purge
+          az account clear

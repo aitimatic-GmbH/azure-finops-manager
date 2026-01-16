@@ -1,0 +1,234 @@
+# .github/workflows/1-analyze-and-report.yml
+
+name: 'Reuseable: Analyze and Report'
+
+# ====================================================================
+# TRIGGER:
+# 1. Kann von einem anderen Workflow aufgerufen werden (für die CI-Pipeline).
+# 2. Kann manuell gestartet werden
+# ====================================================================
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  # ====================================================================
+  # JOB 1: ANALYZE
+  # Dieser Job führt die lesenden Operationen auf Azure aus.
+  # ====================================================================
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Checkout code'
+        uses: actions/checkout@v6
+
+      - name: 'Build Runtime Configuration from Repository Variable'
+        # Wir übergeben die Variable als Umgebungsvariable, um Shell-Expansionsprobleme zu vermeiden.
+        env:
+          CONFIG_JSON: ${{ vars.FINOPS_CONFIG_JSON }}
+        run: |
+          echo "INFO: Building runtime configuration from repository variable..."
+          
+          # Prüfe, ob die Umgebungsvariable existiert und nicht leer ist.
+          if [[ -z "$CONFIG_JSON" ]]; then
+            echo "::error::Repository variable FINOPS_CONFIG_JSON is not set or is empty."
+            exit 1
+          fi
+          
+          # Schreibe den Inhalt der Umgebungsvariable direkt in die Laufzeit-Konfigurationsdatei.
+          # 'printf "%s"' ist sicherer als 'echo' für beliebige Strings.
+          printf "%s" "$CONFIG_JSON" > runtime_config.json
+          
+          # Validiere, ob die geschriebene Datei gültiges JSON ist.
+          if ! jq -e . runtime_config.json > /dev/null; then
+            echo "::error::Content of FINOPS_CONFIG_JSON is not valid JSON."
+            # Gib den fehlerhaften Inhalt für Debugging-Zwecke aus
+            echo "--- Invalid content received: ---"
+            cat runtime_config.json
+            echo "---------------------------------"
+            exit 1
+          fi
+
+          echo "INFO: Runtime configuration created successfully."
+
+      - name: 'Read configuration from runtime_config.json'
+        id: config
+        run: |
+          # --- Unattached Disks ---
+          disks_enabled=$(jq -r '.analysis_modules.unattached_disks.enabled' runtime_config.json)
+          echo "unattached_disks_enabled=$disks_enabled" >> "$GITHUB_OUTPUT"
+
+          # --- Unassociated Public IPs ---
+          ips_enabled=$(jq -r '.analysis_modules.unassociated_public_ips.enabled' runtime_config.json)
+          echo "unassociated_public_ips_enabled=$ips_enabled" >> "$GITHUB_OUTPUT"
+
+          # --- Old Snapshots ---
+          snapshots_enabled=$(jq -r '.analysis_modules.old_snapshots.enabled' runtime_config.json)
+          echo "old_snapshots_enabled=$snapshots_enabled" >> "$GITHUB_OUTPUT"
+
+          # --- Azure Advisor ---
+          advisor_enabled=$(jq -r '.analysis_modules.azure_advisor.enabled' runtime_config.json)
+          echo "azure_advisor_enabled=$advisor_enabled" >> "$GITHUB_OUTPUT"
+
+          # --- Underutilized VMs ---
+          vms_enabled=$(jq -r '.analysis_modules.underutilized_vms.enabled' runtime_config.json)
+          echo "underutilized_vms_enabled=$vms_enabled" >> "$GITHUB_OUTPUT"
+
+          echo "--- Enabled Modules (from runtime_config.json) ---"
+          echo "Unattached Disks: $disks_enabled"
+          echo "Unassociated IPs: $ips_enabled"
+          echo "Old Snapshots: $snapshots_enabled"
+          echo "Azure Advisor: $advisor_enabled"
+          echo "Underutilized VMs: $vms_enabled"
+          echo "--------------------------------------------------"
+
+      - name: 'Azure Login'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # --------------------------------------------------------------------
+      # ANALYSE-MODULE
+      # Jeder der folgenden Schritte ist ein eigenständiges Analyse-Modul.
+      # Die Ausführung wird über die 'finops.config.json'-Datei gesteuert.
+      # --------------------------------------------------------------------
+
+      - name: 'Module: Find unattached disks'
+        if: steps.config.outputs.unattached_disks_enabled == 'true'
+        run: |
+          # Leere die Zieldatei zu Beginn, um sicherzustellen, dass keine alten Ergebnisse vorhanden sind.
+          true > analysis-unattached-disks.tsv
+
+          # Schritt 1: Ermittle die Liste der zu durchsuchenden Ressourcengruppen.
+          # Wir verwenden 'comm' und Prozess-Substitution, um temporäre Dateien zu vermeiden.
+          # 'comm' vergleicht zwei sortierte Listen und gibt die Unterschiede aus.
+          # '-23' bedeutet: Gib nur die Zeilen aus, die exklusiv in der ersten Liste vorkommen.
+          mapfile -t RGS_TO_SCAN < <(comm -23 \
+              <(az group list --query "[].name" -o tsv | sort) \
+              <(jq -r '.global_settings.excluded_resource_groups[]' finops.config.json | sort) \
+          )
+
+          # Schritt 2: Iteriere NUR durch die gefilterte Liste und sammle die Ergebnisse.
+          echo "INFO: Found ${#RGS_TO_SCAN[@]} resource groups to scan."
+
+          for rg in "${RGS_TO_SCAN[@]}"; do
+            # Wir geben den Namen der geprüften RG aus, um den Fortschritt im Log zu sehen.
+            echo "   - Checking for unattached disks in resource group: $rg"
+            # Führe den 'az disk list'-Befehl für die spezifische Ressourcengruppe aus.
+            # Hänge das Ergebnis (falls vorhanden) an die Zieldatei an (>>).
+            az disk list --resource-group "$rg" --query "[?diskState=='Unattached'].{Name:name, ResourceGroup:resourceGroup, SizeGB:diskSizeGb, Location:location}" --output tsv >> analysis-unattached-disks.tsv || true
+          done
+
+          # Schritt 3: Zähle die finalen Ergebnisse und gib eine Statusmeldung aus.
+          RESULT_COUNT=$(wc -l < analysis-unattached-disks.tsv)
+          echo "Found $RESULT_COUNT unattached disks."
+
+      - name: 'Module: Find unassociated public IPs'
+        if: steps.config.outputs.unassociated_public_ips_enabled == 'true'
+        run: |
+          EXCLUSION_FILTER=""
+          for rg in $(jq -r '.global_settings.excluded_resource_groups[]' finops.config.json); do
+            EXCLUSION_FILTER+="&& resourceGroup!='$rg'"
+          done
+
+          az network public-ip list --query "[?ipConfiguration==null $EXCLUSION_FILTER].{Name:name, ResourceGroup:resourceGroup, IPAddress:ipAddress, Location:location}" --output tsv > analysis-unassociated-public-ips.tsv || true
+          echo "Found $(wc -l < analysis-unassociated-public-ips.tsv) unassociated public IPs."
+
+      - name: 'Module: Find old snapshots'
+        if: steps.config.outputs.old_snapshots_enabled == 'true'
+        run: |
+          RETENTION_DAYS=$(jq -r '.analysis_modules.old_snapshots.retention_days' finops.config.json)
+          cutoff_date=$(date -d "-$RETENTION_DAYS days" -u +'%Y-%m-%dT%H:%M:%SZ')
+          
+          EXCLUSION_FILTER=""
+          for rg in $(jq -r '.global_settings.excluded_resource_groups[]' finops.config.json); do
+            EXCLUSION_FILTER+="&& resourceGroup!='$rg'"
+          done
+
+          az snapshot list --query "[?timeCreated < '$cutoff_date' $EXCLUSION_FILTER].{Name:name, ResourceGroup:resourceGroup, SizeGB:diskSizeGb, Location:location}" --output tsv > analysis-old-snapshots.tsv || true
+          echo "Found $(wc -l < analysis-old-snapshots.tsv) snapshots older than $RETENTION_DAYS days."
+
+      - name: 'Module: Get Azure Advisor recommendations'
+        if: steps.config.outputs.azure_advisor_enabled == 'true'
+        run: |
+          CATEGORIES=$(jq -r '.analysis_modules.azure_advisor.categories | join(" ")' finops.config.json)
+
+          az advisor recommendation list --category "$CATEGORIES" --query "[].{Description:shortDescription.problem, Resource:resourceMetadata.resourceId, Category:category}" --output tsv > analysis-azure-advisor-recommendations.tsv || true
+          echo "Found $(wc -l < analysis-azure-advisor-recommendations.tsv) Advisor recommendations for categories: \"$CATEGORIES\"."
+
+      - name: 'Module: Find underutilized VMs'
+        # Die if-Bedingung greift auf den Output des 'config'-Schritts zu.
+        if: steps.config.outputs.underutilized_vms_enabled == 'true'
+        # Wir setzen die Azure Subscription ID als Umgebungsvariable für das Python-Skript.
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        # Wir verwenden eine separate Shell, um die Python-Umgebung zu verwalten.
+        shell: bash
+        run: |
+          echo "--- Running Python script for Underutilized VM analysis ---"
+          
+          # Schritt 1: Installiere die notwendigen Python-Bibliotheken.
+          # Die '--quiet'- und '--no-warn-script-location'-Flags halten das Log sauber.
+          python -m pip install --upgrade pip --quiet
+          pip install --quiet --no-warn-script-location \
+            azure-identity \
+            azure-mgmt-resource \
+            azure-mgmt-compute \
+            azure-mgmt-monitor
+          
+          echo "INFO: Python dependencies installed."
+          
+          # Schritt 2: Führe das Python-Analyse-Skript aus.
+          # Das Skript liest die 'runtime_config.json' und schreibt 'analysis-underutilized-vms.tsv'.
+          python .github/scripts/find_underutilized_vms.py
+          
+          echo "--- Python script finished ---"
+
+      # --------------------------------------------------------------------
+      # WORKFLOW-ABSCHLUSS
+      # --------------------------------------------------------------------
+
+      - name: 'Upload analysis results as artifact'
+        uses: actions/upload-artifact@v4
+        with:
+          name: finops-analysis-results
+          path: analysis-*.tsv
+          if-no-files-found: ignore
+
+      - name: 'Azure Logout'
+        run: |
+          az logout
+          az cache purge
+          az account clear
+
+  # ====================================================================
+  # JOB 2: REPORT
+  # Dieser Job wartet auf den Analyse-Job und erstellt den Report.
+  # ====================================================================
+  report:
+    runs-on: ubuntu-latest
+    # 'needs: analyze' stellt sicher, dass dieser Job erst nach erfolgreichem Abschluss des 'analyze'-Jobs startet.
+    needs: analyze
+
+    steps:
+      - name: 'Checkout code'
+        uses: actions/checkout@v6
+
+      - name: 'Download analysis results'
+        uses: actions/download-artifact@v4
+        with:
+          name: finops-analysis-results
+
+      - name: 'Generate Markdown Report'
+        run: |
+          chmod +x .github/scripts/generate-report.sh
+          ./.github/scripts/generate-report.sh
+
+      - name: 'Upload final report'
+        uses: actions/upload-artifact@v4
+        with:
+          name: finops-cost-report
+          path: report.md
+          if-no-files-found: error
