@@ -41,7 +41,7 @@ on:
         required: true
       AZURE_WRITE_TENANT_ID:
         required: true
-      AZURE_WRITE_SUBSCRIPTION_ID:
+      AZURE_SUBSCRIPTION_ID:
         required: true
   push:
     branches:
