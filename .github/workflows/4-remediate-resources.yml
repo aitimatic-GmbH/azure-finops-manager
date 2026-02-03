@@ -1,6 +1,6 @@
 # .github/workflows/4-remediate-resources.yml
 
-name: '4 - Remediate Azure Resources'
+name: 'Reusable - FinOps Remediate Resources'
 
 on:
   workflow_dispatch:
@@ -22,6 +22,27 @@ on:
       confirmation_phrase:
         description: 'Type "DELETE" to confirm the remediation action. (Not required for DRY-RUN)'
         required: false
+  workflow_call:
+    inputs:
+      analysis_run_id:
+        description: 'ID of the analysis run to use for remediation'
+        required: true
+        type: string
+      resource_type_to_remediate:
+        description: 'Type of resource to remediate (or DRY-RUN)'
+        required: true
+        type: string # 'choice' ist hier nicht unterstützt, wird im aufrufenden Workflow validiert
+      confirmation_phrase:
+        description: 'Confirmation phrase for remediation'
+        required: false
+        type: string
+    secrets:
+      AZURE_WRITE_CLIENT_ID:
+        required: true
+      AZURE_WRITE_TENANT_ID:
+        required: true
+      AZURE_WRITE_SUBSCRIPTION_ID:
+        required: true
   push:
     branches:
       - feature/**
