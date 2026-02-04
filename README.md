@@ -36,17 +36,20 @@ Ein separater Workflow, **`2-remediate-resources.yml`**, existiert für die opti
 
 ## Lizenz
 
-Dieses Projekt ist unter der [MIT License](LICENSE) lizenziert.
-
+MIT License – siehe [LICENSE](LICENSE)  
 Copyright (c) 2026 aitimatic GmbH
 
-## Disclaimer
+**Haftungsausschluss:** Bereitstellung „as-is“ ohne Gewährleistung. Autoren und Inhaber haften nicht für Schäden oder Ansprüche.
 
-**Dieses Repository wird "as-is" ohne jegliche Garantie bereitgestellt.**
+Siehe [SECURITY.md](SECURITY.md) für Security-Richtlinien.
 
-Die Nutzung erfolgt auf eigenes Risiko. Wir übernehmen keine Haftung für Schäden, die durch die Verwendung dieses Codes entstehen.
+---
 
-Für Details siehe [LICENSE](LICENSE) und [SECURITY.md](SECURITY.md).
+## Beiträge
+
+Dieses Repository akzeptiert keine externen Beiträge. Siehe [CONTRIBUTING.md](CONTRIBUTING.md) für Details.
+
 
 ---
 **Status:** In Entwicklung | **Primäre Plattform:** Azure | **Konfiguration:** `finops.config.json`
+
