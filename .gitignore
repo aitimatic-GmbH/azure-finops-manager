@@ -14,3 +14,20 @@ bin/*
 #Python 
 .venv/
 __pycache__
+
+
+# Secrets & Credentials
+.env
+.env.*
+*.key
+*.pem
+credentials.*
+*-key.json
+*service-account*.json
+.secrets
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+crash.log
