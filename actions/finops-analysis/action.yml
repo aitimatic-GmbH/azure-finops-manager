@@ -32,7 +32,7 @@ runs:
       shell: bash
       run: |
         # Pfad relativ zum Action-Verzeichnis
-        CONFIG_FILE="${{ github.action_path }}/${{ inputs.config-path }}"
+        CONFIG_FILE="${{ inputs.config-path }}"
 
         # Prüfe, ob die Config-Datei existiert
         if [[ ! -f "$CONFIG_FILE" ]]; then
@@ -166,7 +166,7 @@ runs:
         cp "${{ steps.config.outputs.config_file }}" runtime_config.json
 
         # Führe das Python-Skript aus dem Submodul aus
-        python "${{ github.action_path }}/../../.github/scripts/find_underutilized_vms.py"
+        python "services/azure-finops-manager/.github/scripts/find_underutilized_vms.py"
 
         echo "--- Python script finished ---"
 
@@ -196,7 +196,7 @@ runs:
     - name: 'Generate Markdown Report'
       shell: bash
       run: |
-        SCRIPT_PATH="${{ github.action_path }}/../../.github/scripts/generate-report.sh"
+        SCRIPT_PATH="services/azure-finops-manager/.github/scripts/generate-report.sh"
         chmod +x "$SCRIPT_PATH"
         "$SCRIPT_PATH"
 
