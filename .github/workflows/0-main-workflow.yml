@@ -13,7 +13,7 @@ on:
   workflow_call:
     inputs:
       config-path:
-        description: 'Path to the finops.config.json file'
+        description: 'Pfad zur finops.config.json-Datei'
         required: true
         type: string
     secrets:
