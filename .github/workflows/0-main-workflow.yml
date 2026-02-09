@@ -1,6 +1,6 @@
 # .github/workflows/0-main-workflow.yml
 
-name: '0 - Main CI Workflow'
+name: 'Reusable - FinOps Analyze and Report'
 
 on:
   push:
@@ -10,6 +10,19 @@ on:
     branches:
       - main
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      config-path:
+        description: 'Pfad zur finops.config.json-Datei'
+        required: true
+        type: string
+    secrets:
+      AZURE_CLIENT_ID:
+        required: true
+      AZURE_TENANT_ID:
+        required: true
+      AZURE_SUBSCRIPTION_ID:
+        required: true
 
 permissions:
   id-token: write

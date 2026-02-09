@@ -25,7 +25,7 @@ Dieser zentrale Workflow führt den gesamten Prozess in zwei logischen, voneinan
 
 Ein separater Workflow, **`2-remediate-resources.yml`**, existiert für die optionale, manuelle Bereinigung der gefundenen Ressourcen und erfordert separate, erhöhte Berechtigungen.
 
-## Quick Start (Für einen neuen Kunden)
+## Quick Start
 
 1.  **Azure-Anmeldedaten einrichten:** Folgen Sie der Anleitung im **[Customer Onboarding Guide](./docs/1-customer-onboarding.md)**, um die notwendigen Azure-Credentials als GitHub Secrets zu konfigurieren.
 2.  **Analyse konfigurieren:** Passen Sie die Datei **`finops.config.json`** an Ihre Bedürfnisse an. Aktivieren/deaktivieren Sie Module und definieren Sie Ressourcengruppen, die von der Analyse ausgeschlossen werden sollen.
@@ -33,4 +33,23 @@ Ein separater Workflow, **`2-remediate-resources.yml`**, existiert für die opti
 4.  **Ergebnis prüfen:** Nach Abschluss des Laufs finden Sie den fertigen Bericht (`finops-cost-report.md`) im Artefakt-Bereich des Workflow-Laufs zum Download.
 
 ---
+
+## Lizenz
+
+MIT License – siehe [LICENSE](LICENSE)  
+Copyright (c) 2026 aitimatic GmbH
+
+**Haftungsausschluss:** Bereitstellung „as-is“ ohne Gewährleistung. Autoren und Inhaber haften nicht für Schäden oder Ansprüche.
+
+Siehe [SECURITY.md](SECURITY.md) für Security-Richtlinien.
+
+---
+
+## Beiträge
+
+Dieses Repository akzeptiert keine externen Beiträge. Siehe [CONTRIBUTING.md](CONTRIBUTING.md) für Details.
+
+
+---
 **Status:** In Entwicklung | **Primäre Plattform:** Azure | **Konfiguration:** `finops.config.json`
+
